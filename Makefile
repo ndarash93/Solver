@@ -25,6 +25,9 @@ TARGET = $(BUILD_DIR)/Solver
 # Build rules
 all: $(TARGET)
 
+$(BUILD_DIR):
+	makdir -p $(BUILD_DIR)
+
 $(TARGET): $(OBJ_FILES)
 	$(CC) $(CFLAGS) $^ -o $@
 
