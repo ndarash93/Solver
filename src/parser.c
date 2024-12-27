@@ -22,7 +22,7 @@ static void free_list(struct collision_list *list);
 static struct collision_list **create_overflow(struct table *table);
 static void free_overflow(struct table *table);
 static void table_delete(struct table *table, char *key);
-static void handle_version(int version){
+static void handle_version(int version);
 
 struct token{
   char *key;
