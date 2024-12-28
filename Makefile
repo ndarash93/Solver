@@ -26,12 +26,12 @@ TARGET = $(BUILD_DIR)/Solver
 all: $(TARGET)
 
 $(BUILD_DIR):
-	makdir -p $(BUILD_DIR)
+	mkdir -p $(BUILD_DIR)
 
 $(TARGET): $(OBJ_FILES)
 	$(CC) $(CFLAGS) $^ -o $@
 
-$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 .PHONY: clean
