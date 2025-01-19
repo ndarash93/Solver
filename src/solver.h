@@ -9,6 +9,11 @@
 
 
 extern struct Board {
+  FILE *file;
+  // Kicad PCB
+  int kicad_pcb;
+
+  // Header
   int version;
   char *generator;
   char *generator_version;
