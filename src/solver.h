@@ -9,7 +9,10 @@
 
 
 extern struct Board {
-  FILE *file;
+  // Buffer
+  char *buffer;
+  long buffer_length, buffer_index;
+
   // Kicad PCB
   int kicad_pcb;
 
@@ -31,6 +34,23 @@ extern struct Board {
   struct Groups *groups;
 } *pcb;
 
+/*
+struct token{
+  char *key;
+  void (*handler)();
+};
+
+struct table{
+  struct token **tokens;
+  struct collision_list **overflow;
+  int size, count;
+};  
+
+struct collision_list{
+  struct token *token;
+  struct collision_list *next;
+};
+*/
 
 struct General {
   float thickness;
@@ -85,7 +105,9 @@ struct at {
   float x, y, angle;
 };
 
-  
+// Solver
+void free_pcb();  
+
 // Parser
-int open_pcb(const char *path);
+int open_pcb();
 void token_table_init();

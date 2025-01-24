@@ -3,7 +3,7 @@
 #define HASH_CAP 5000
 #define TOKEN_SZ 250
 
-static void parse_pcb(FILE *file);
+static void parse_pcb();
 static void parse_header(char *contents);
 static int token_lookup(const char *token);
 static unsigned long hash(const char *token);
@@ -23,8 +23,10 @@ static void free_list(struct collision_list *list);
 static struct collision_list **create_overflow(struct table *table);
 static void free_overflow(struct table *table);
 static void table_delete(struct table *table, char *key);
-static void handle_version(const char *token);
-static void handle_kicadpcb(const char *token);
+
+static void handle_version();
+static void handle_kicadpcb();
+static void handle_generator();
 
 struct token{
   char *key;
@@ -42,31 +44,54 @@ struct collision_list{
   struct collision_list *next;
 };
 
+static struct table *tokens = NULL;
 
 void token_table_init(){
-  struct table *tokens = create_table(HASH_CAP);
+  tokens = create_table(HASH_CAP);
+  printf("Tokens %p\n", tokens);
   insert(tokens, (char *)"kicad_pcb", handle_kicadpcb);
   insert(tokens, (char *)"version", handle_version);
-  insert(tokens, (char *)"generator", NULL);
-  print_search(tokens, (char *)"kicad_pcb");
-  print_search(tokens, (char *)"version");
-  print_table(tokens);
-  free_table(tokens);
+  insert(tokens, (char *)"generator", handle_generator);
+  //print_search(tokens, (char *)"kicad_pcb");
+  //print_search(tokens, (char *)"version");
+  //print_table(tokens);
+  //free_table(tokens);
 }
 
 int open_pcb(const char *path){
-  printf("sdfsdaf\n");
+  long length, bytes_read;
+  char *buffer = NULL;
   FILE *file;
+
   printf("Opening file %s\n", path);
-  file = fopen(path, "r");
+  file = fopen(path, "rb");
 
   if (file == NULL){
     perror("Error opening file");
     return ERROR;
   }
-  pcb->file = file;
-  parse_pcb(file);
+  //pcb->file = file;
+  fseek(file, 0, SEEK_END);
+  length = ftell(file);
+  fseek(file, 0, SEEK_SET);
+  buffer = malloc(length);
+
+  if(buffer)
+    bytes_read = fread(buffer, 1, length, file);
   fclose(file);
+  if (bytes_read != length){
+    printf("Read error");
+    free(buffer);
+    return ERROR;
+  }
+  
+  pcb->buffer = buffer;
+  pcb->buffer_length = length;
+  pcb->buffer_index = 0;
+
+  parse_pcb();
+  free(buffer);
+  free_table(tokens);
   return SUCCESS;
 }
 
@@ -74,39 +99,44 @@ static void parse_header(char *contents){
   
 }
 
-
-static void parse_pcb(FILE *file){
+#define CHAR pcb->buffer[pcb->buffer_index]
+static void parse_pcb(){
+  void (*handler)() = NULL;
   char token[TOKEN_SZ];
   for(int i = 0; i < TOKEN_SZ; i++)
     token[i] = '\0';
-  int open = 0, index = 0;
-  char currentChar = 0, ch;
+  int open = 0, token_index = 0;
   printf("Parsing PCB\n");
-  while((ch = fgetc(file)) != EOF){
-    if (ch == '('){
+  while(pcb->buffer_index++ < pcb->buffer_length){
+    if (CHAR == '('){
       open++;
-      index = 0;
+      token_index = 0;
     }
-    else if (ch == ')'){
+    else if (CHAR == ')'){
       open--;
-      index = 0;
+      token_index = 0;
     }
-    else if(ch == ' ')
-      index = 0;
-    else if(ch == '\n')
-      index = 0;
-    else if(ch == '\t')
-      index = 0;
+    else if(CHAR == ' ')
+      token_index = 0;
+    else if(CHAR == '\n')
+      token_index = 0;
+    else if(CHAR == '\t')
+      token_index = 0;
     else{
-      while(ch != ' ' && ch != ')' && ch != '\n' && ch != '\t' && ch != EOF && index < TOKEN_SZ){
-        token[index++] = ch;
-        ch = fgetc(file);
+      while(CHAR != ' ' && CHAR != ')' && CHAR != '\n' && CHAR != '\t' && CHAR != '\0' && token_index < TOKEN_SZ-1){
+        token[token_index++] = CHAR;
+        pcb->buffer_index++;
+        //printf("Char: %c\n", CHAR);
       }
-      token[index] = '\0';
+      token[token_index] = '\0';
       //printf("Token: %s\n", token);
+      
+      if((handler = search_token(tokens, token)) != NULL)
+        handler();
     }
   }
 }
+#undef CHAR
 
 static unsigned long hash(const char *token){
   unsigned long i = 0;
@@ -222,49 +252,48 @@ static void handle_collision(struct table *table, unsigned long index, struct to
 }
 
 static void print_search(struct table *table, char *key){
-  void (*handler)(const char *);
+  void (*handler)();
   if((handler = search_token(table, key)) == NULL){
     printf("Key: %s does not exist.\n", key);
     return;
   }else{
     printf("Key: %s, Val: %p\n", key, handler);
-    if(handler)
+    if(handler){
       printf("key: %s\n", key);
-      handler(key);
-  }
-}
-
-static void handle_version(const char* token){
-  printf("TOKEN: %s\n", token);
-  char *str = "version";
-  char current_char;
-  char version[TOKEN_SZ];
-  int i = 0, int_version;
-  if(strcmp(token, str) == 0){
-    printf("Found token version");
-    while((current_char = fgetc(pcb->file)) != ')'){
-      if(current_char == ' ' || current_char == '\t');
-      if(i > TOKEN_SZ){
-        printf("Error token overflow");
-        return;
-      }
-      version[i++] = current_char;
+      handler();
     }
-    version[i] = '\0';
   }
-  else{
-    printf("Some kind of error");
-    return;
-  }
-  //int_version = atoi(version);
-
-  //printf("Version: %d", int_version);
-  //pcb->version = int_version;
 }
 
-static void handle_kicadpcb(const char *token){
-  printf("Found %s\n", token);
+// Handle Token Functions
+static void handle_version(){
+  char version[TOKEN_SZ];
+  int token_index = 0;
+  while(pcb->buffer[++pcb->buffer_index] == ' '); 
+  while(pcb->buffer[pcb->buffer_index] != ')')
+    version[token_index++] = pcb->buffer[pcb->buffer_index++];
+  version[token_index] = '\0';
+  pcb->version = atoi(version);
+  printf("Found version: %d\n",pcb->version);
+  return;
 }
+
+static void handle_kicadpcb(){
+  printf("Found kicad_pcb\n");
+}
+
+static void handle_generator(){
+  char generator[TOKEN_SZ];
+  int token_index = 0;
+  while(pcb->buffer[++pcb->buffer_index] == ' ');
+  while(pcb->buffer[pcb->buffer_index] != ')')
+    generator[token_index++] = pcb->buffer[pcb->buffer_index++];
+  generator[token_index] = '\0';
+  pcb->generator = malloc(strlen(generator) * sizeof(char));
+  strcpy(pcb->generator, generator);
+  printf("Found generator: %s\n",pcb->generator);
+}
+
 
 static struct collision_list* allocate_list(){
   return (struct collision_list*) malloc(sizeof(struct collision_list));
