@@ -20,5 +20,7 @@ int main(int argc, char **argv){
 
 void free_pcb(){
   free(pcb->generator);
+  free(pcb->generator_version);
+  free(pcb->general);
   free(pcb);
 }

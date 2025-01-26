@@ -12,6 +12,7 @@ extern struct Board {
   // Buffer
   char *buffer;
   long buffer_length, buffer_index;
+  int opens;
 
   // Kicad PCB
   int kicad_pcb;
@@ -54,7 +55,7 @@ struct collision_list{
 
 struct General {
   float thickness;
-  int legacy_teardrops;
+  int legacy_teardrops, in_general;
 };
 
 struct Layers {

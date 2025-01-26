@@ -7,11 +7,11 @@ static void parse_pcb();
 static void parse_header(char *contents);
 static int token_lookup(const char *token);
 static unsigned long hash(const char *token);
-static struct token *create_token(const char *key, void (*handler)());
+static struct token *create_token(const char *key, int (*handler)());
 static struct table *create_table(int size);
 static void free_token(struct token *token);
 static void free_table(struct table *table);
-static void insert(struct table *table, char* key, void (*handler)());
+static void insert(struct table *table, char* key, int (*handler)());
 static void *search_token(struct table *table, char* key);
 static void print_table(struct table *table);
 static void handle_collision(struct table *table, unsigned long index, struct token *token);
@@ -24,13 +24,16 @@ static struct collision_list **create_overflow(struct table *table);
 static void free_overflow(struct table *table);
 static void table_delete(struct table *table, char *key);
 
-static void handle_version();
-static void handle_kicadpcb();
-static void handle_generator();
+static int handle_version();
+static int handle_kicadpcb();
+static int handle_generator();
+static int handle_generator_version();
+static int handle_general();
+static int handle_thickness();
 
 struct token{
   char *key;
-  void (*handler)();
+  int (*handler)();
 };
 
 struct table{
@@ -52,6 +55,9 @@ void token_table_init(){
   insert(tokens, (char *)"kicad_pcb", handle_kicadpcb);
   insert(tokens, (char *)"version", handle_version);
   insert(tokens, (char *)"generator", handle_generator);
+  insert(tokens, (char *)"generator_version", handle_generator_version);
+  insert(tokens, (char *)"general", handle_general);
+  insert(tokens, (char *)"thickness", handle_thickness);
   //print_search(tokens, (char *)"kicad_pcb");
   //print_search(tokens, (char *)"version");
   //print_table(tokens);
@@ -81,8 +87,7 @@ int open_pcb(const char *path){
   fclose(file);
   if (bytes_read != length){
     printf("Read error");
-    free(buffer);
-    return ERROR;
+    goto clean_up;
   }
   
   pcb->buffer = buffer;
@@ -90,6 +95,8 @@ int open_pcb(const char *path){
   pcb->buffer_index = 0;
 
   parse_pcb();
+
+clean_up:
   free(buffer);
   free_table(tokens);
   return SUCCESS;
@@ -101,19 +108,19 @@ static void parse_header(char *contents){
 
 #define CHAR pcb->buffer[pcb->buffer_index]
 static void parse_pcb(){
-  void (*handler)() = NULL;
+  int (*handler)() = NULL;
   char token[TOKEN_SZ];
   for(int i = 0; i < TOKEN_SZ; i++)
     token[i] = '\0';
-  int open = 0, token_index = 0;
+  int token_index = 0;
   printf("Parsing PCB\n");
   while(pcb->buffer_index++ < pcb->buffer_length){
     if (CHAR == '('){
-      open++;
+      pcb->opens++;
       token_index = 0;
     }
     else if (CHAR == ')'){
-      open--;
+      pcb->opens--;
       token_index = 0;
     }
     else if(CHAR == ' ')
@@ -132,7 +139,8 @@ static void parse_pcb(){
       //printf("Token: %s\n", token);
       
       if((handler = search_token(tokens, token)) != NULL)
-        handler();
+        if(handler() == ERROR)
+          return;
     }
   }
 }
@@ -147,7 +155,7 @@ static unsigned long hash(const char *token){
 }
 
 
-static struct token *create_token(const char *key, void (*handler)()){
+static struct token *create_token(const char *key, int (*handler)()){
   struct token *token = (struct token *) malloc(sizeof(struct token));
   token->key = (char*) malloc(strlen(key) + 1);
   strcpy(token->key, key);
@@ -186,7 +194,7 @@ static void free_table(struct table *table){
   free(table);
 }
 
-static void insert(struct table *table, char* key, void (*handler)()){
+static void insert(struct table *table, char* key, int (*handler)()){
   struct token *token = create_token(key, handler);
   int index = hash(key);
   struct token *current = table->tokens[index];
@@ -263,35 +271,6 @@ static void print_search(struct table *table, char *key){
       handler();
     }
   }
-}
-
-// Handle Token Functions
-static void handle_version(){
-  char version[TOKEN_SZ];
-  int token_index = 0;
-  while(pcb->buffer[++pcb->buffer_index] == ' '); 
-  while(pcb->buffer[pcb->buffer_index] != ')')
-    version[token_index++] = pcb->buffer[pcb->buffer_index++];
-  version[token_index] = '\0';
-  pcb->version = atoi(version);
-  printf("Found version: %d\n",pcb->version);
-  return;
-}
-
-static void handle_kicadpcb(){
-  printf("Found kicad_pcb\n");
-}
-
-static void handle_generator(){
-  char generator[TOKEN_SZ];
-  int token_index = 0;
-  while(pcb->buffer[++pcb->buffer_index] == ' ');
-  while(pcb->buffer[pcb->buffer_index] != ')')
-    generator[token_index++] = pcb->buffer[pcb->buffer_index++];
-  generator[token_index] = '\0';
-  pcb->generator = malloc(strlen(generator) * sizeof(char));
-  strcpy(pcb->generator, generator);
-  printf("Found generator: %s\n",pcb->generator);
 }
 
 
@@ -424,3 +403,85 @@ static void table_delete(struct table *table, char *key){
 }
 
 
+
+// Handle Token Functions
+#define BUFF pcb->buffer
+#define INDEX pcb->buffer_index
+static int handle_version(){
+  char version[TOKEN_SZ];
+  int token_index = 0;
+  while(pcb->buffer[++pcb->buffer_index] == ' '); 
+  while(pcb->buffer[pcb->buffer_index] != ')')
+    version[token_index++] = pcb->buffer[pcb->buffer_index++];
+  version[token_index] = '\0';
+  pcb->version = atoi(version);
+  printf("Found version: %d\n",pcb->version);
+  return SUCCESS;
+}
+
+static int handle_kicadpcb(){
+  printf("Found kicad_pcb\n");
+  return SUCCESS;
+}
+
+static int handle_generator(){
+  char generator[TOKEN_SZ];
+  int token_index = 0;
+  while(pcb->buffer[++pcb->buffer_index] == ' ');
+  while(pcb->buffer[pcb->buffer_index] != ')')
+    generator[token_index++] = pcb->buffer[pcb->buffer_index++];
+  generator[token_index] = '\0';
+  pcb->generator = malloc(strlen(generator) * sizeof(char));
+  strcpy(pcb->generator, generator);
+  printf("Found generator: %s\n",pcb->generator);
+  return SUCCESS;
+}
+
+static int handle_generator_version(){
+  char generator_version[TOKEN_SZ];
+  int token_index = 0;
+  while(BUFF[++INDEX] == ' ');
+  while(BUFF[INDEX] != ')')
+    generator_version[token_index++] = BUFF[INDEX++];
+  generator_version[token_index] = '\0';
+  pcb->generator_version = malloc(strlen(generator_version) * sizeof(char));
+  strcpy(pcb->generator_version, generator_version);
+  printf("Found generator version: %s\n", pcb->generator_version);
+  return SUCCESS;
+}
+
+static int handle_general(){
+  printf("Found general");
+  if(pcb->opens != 2){
+    printf("Interesting Error");
+    return ERROR;
+  }else{
+    struct General *general = malloc(sizeof(struct General));
+    pcb->general = general;
+    pcb->general->in_general = 1;
+  }
+  return SUCCESS;
+}
+
+static int handle_thickness(){
+  printf("Found thickness");
+  if(pcb->opens != 2 || pcb->general == NULL || pcb->general->in_general != 1){
+    printf("Interesting Error");
+    return ERROR;
+  }
+  char thickness[TOKEN_SZ];
+  char *endptr;
+  int token_index = 0;
+  while(BUFF[++INDEX] == ' ');
+  while(BUFF[INDEX] != ')')
+    thickness[token_index] = BUFF[INDEX++];
+  thickness[token_index] = '\0';
+  pcb->general->thickness = strtof(thickness, &endptr);
+  if(thickness == endptr)
+    return ERROR;
+  printf("Found thickness: %f\n", pcb->general->thickness);
+  return SUCCESS;
+}
+
+#undef BUFF
+#undef INDEX
