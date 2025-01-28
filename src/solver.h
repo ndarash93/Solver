@@ -3,60 +3,26 @@
 #include <string.h>
 #include <stdint.h>
 
+#include "utils.h"
 
 #define ERROR -1
 #define SUCCESS 1
 
-
-extern struct Board {
-  // Buffer
-  char *buffer;
-  long buffer_length, buffer_index;
-  int opens;
-
-  // Kicad PCB
-  int kicad_pcb;
-
-  // Header
-  int version;
-  char *generator;
-  char *generator_version;
-  struct General *general;
-  struct Layers *layers;
-  struct Setup *setup;
-  //struct Stackup stackup;
-  struct Properties *properties;
-  struct Nets *nets;
-  struct Footprints *footprints;
-  struct Graphic *graphic;
-  struct Images *images;
-  struct Tracks *tracks;
-  struct Zones *zones;
-  struct Groups *groups;
-} *pcb;
-
-/*
-struct token{
-  char *key;
-  void (*handler)();
-};
-
-struct table{
-  struct token **tokens;
-  struct collision_list **overflow;
-  int size, count;
-};  
-
-struct collision_list{
-  struct token *token;
-  struct collision_list *next;
-};
-*/
-
 struct General {
   float thickness;
-  int legacy_teardrops, in_general;
+  int legacy_teardrops;
 };
+
+
+
+#define UNUSED 0
+#define OPEN 1
+#define CLOSED -1
+struct Section{
+  int general;
+};
+
+
 
 struct Layers {
   int *layer;
@@ -100,11 +66,60 @@ struct Footprint {
   char **tags;
 };
 
-
-
 struct at {
   float x, y, angle;
 };
+
+struct File_Buffer {
+  String buffer;
+  uint32_t index;
+};
+
+extern struct Board {
+  // Buffer
+  struct File_Buffer file_buffer;
+  int opens;
+
+  // Section tracking
+  struct Section section;
+
+  // Kicad PCB
+  int kicad_pcb;
+
+  // Header
+  String generator, generator_version, paper, version;
+  struct General general;
+  struct Layers *layers;
+  struct Setup *setup;
+  //struct Stackup stackup;
+  struct Properties *properties;
+  struct Nets *nets;
+  struct Footprints *footprints;
+  struct Graphic *graphic;
+  struct Images *images;
+  struct Tracks *tracks;
+  struct Zones *zones;
+  struct Groups *groups;
+} *pcb;
+
+/*
+struct token{
+  char *key;
+  void (*handler)();
+};
+
+struct table{
+  struct token **tokens;
+  struct collision_list **overflow;
+  int size, count;
+};  
+
+struct collision_list{
+  struct token *token;
+  struct collision_list *next;
+};
+*/
+
 
 // Solver
 void free_pcb();  
