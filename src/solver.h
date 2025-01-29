@@ -40,14 +40,13 @@ struct Page {
 
 struct Layers {
   struct Section_Index index;
-  int *layer;
-};
-
-struct Layer {
-  int ordinal;
-  String name, user_name;
-  String type, material;
-  float thickness, permittivity, loss_tangent; 
+  struct Layer {
+    int ordinal;
+    String name, user_name;
+    String type, material;
+    float thickness, permittivity, loss_tangent; 
+    struct Layer *prev, *next;
+  }; *layer;
 };
 
 struct Setup {
@@ -58,23 +57,17 @@ struct Setup {
   float pad_to_paste_clearance_ratio;
   struct Point *aux_axis_origin;
   struct Point *grid_origin;
-  struct Plot_settings *plotsettings;
+  struct Plot_settings *pcbplotsettings;
   struct Stackup {
     struct Section_Index index;
     // Add
   } stackup;
-};
-
-struct Properties{
-  struct Property{
-    String key, val;
-    struct Property *next, *prev;
-  };
-};
-
-struct Point {
-  float x;
-  float y;
+  struct Properties{
+    struct Property{
+      String key, val;
+      struct Property *next, *prev;
+    } *property;
+  } properties;
 };
 
 struct Nets{
@@ -82,23 +75,72 @@ struct Nets{
   struct Net {
     int ordinal;
     String name;
-    struct Net *prev, *next;
-  };
+  } **net;
 };
 
 // https://dev-docs.kicad.org/en/file-formats/sexpr-intro/index.html#_footprint
 struct Footprint {
-  char *library_link;
-  unsigned long long flags; // locked placed etc.
-  struct Layer layer;
-  int tedit;
-  char *uuid, description;
-  struct at *pos_id;
-  char **tags;
+  String library_link;
+  struct Layer *layer;
+  String uuid, description;
+  struct at at;
+  // Properties properties; // I think text properties are needed to be treated different
+  String path, sheetname, sheetfile, attr;
+  
 };
 
 struct at {
   float x, y, angle;
+};
+
+struct Point {
+  float x;
+  float y;
+};
+
+struct Size{
+  float length, width;
+};
+
+struct Line {
+  struct Point start, end;
+  struct Layer *layer;
+  struct Stroke {
+    float width;
+    String type;
+  };
+  String uuid;
+  struct Line *prev, *next;
+};
+
+#define THRU_HOLE 1
+#define SMD 2
+#define CONNECT 4
+#define NP_THRU_HOLE 8
+
+#define CIRCLE 1
+#define RECT 2
+#define OVAL 4
+#define TRAPEZOID 8
+#define ROUNDRECT 16
+#define CUSTOM 32
+
+struct Pad {
+  String num;
+  int type, shape, function, type;
+  struct at at;
+  struct Size size;
+  struct Layers layers;
+  struct Net *net;
+  String uuid;
+};
+
+struct XYZ{
+  float x, y, z;
+};
+
+struct Model{
+  struct XYZ offset, scale, rotate;
 };
 
 struct File_Buffer {
@@ -120,7 +162,6 @@ extern struct Board {
   struct Page page;
   struct Layers layers;
   struct Setup setup;
-  struct Properties properties;
   struct Nets nets;
   struct Footprints *footprints;
   struct Graphic *graphic;
