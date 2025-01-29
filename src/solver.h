@@ -8,34 +8,50 @@
 #define ERROR -1
 #define SUCCESS 1
 
-struct General {
-  float thickness;
-  int legacy_teardrops;
-};
-
-
 
 #define UNUSED 0
 #define OPEN 1
 #define CLOSED -1
-struct Section{
-  int general;
+
+#define SECTION_SET 1
+#define SECTION_UNSET 0
+
+struct Section_Index{
+  int set;
+  uint64_t section_start;
+  uint64_t section_end;
 };
 
+struct Header{
+  struct Section_Index index;
+  String generator, generator_version, version;
+};
 
+struct General {
+  struct Section_Index index;
+  float thickness;
+  int legacy_teardrops;
+};
+
+struct Page {
+  struct Section_Index index;
+  String paper;
+};
 
 struct Layers {
+  struct Section_Index index;
   int *layer;
 };
 
 struct Layer {
   int ordinal;
-  char *name, *user_name;
-  int type;
+  String name, user_name;
+  String type, material;
+  float thickness, permittivity, loss_tangent; 
 };
 
 struct Setup {
-  //void STACK_UP_SETTINGS s;
+  struct Section_Index index;
   float pad_to_mask_clearance;
   float solder_mask_min_width;
   float pad_to_paste_clearance;
@@ -43,6 +59,17 @@ struct Setup {
   struct Point *aux_axis_origin;
   struct Point *grid_origin;
   struct Plot_settings *plotsettings;
+  struct Stackup {
+    struct Section_Index index;
+    // Add
+  } stackup;
+};
+
+struct Properties{
+  struct Property{
+    String key, val;
+    struct Property *next, *prev;
+  };
 };
 
 struct Point {
@@ -50,9 +77,13 @@ struct Point {
   float y;
 };
 
-struct Net {
-  int ordinal;
-  char *name;
+struct Nets{
+  struct Section_Index index;
+  struct Net {
+    int ordinal;
+    String name;
+    struct Net *prev, *next;
+  };
 };
 
 // https://dev-docs.kicad.org/en/file-formats/sexpr-intro/index.html#_footprint
@@ -80,20 +111,17 @@ extern struct Board {
   struct File_Buffer file_buffer;
   int opens;
 
-  // Section tracking
-  struct Section section;
-
   // Kicad PCB
   int kicad_pcb;
 
   // Header
-  String generator, generator_version, paper, version;
+  struct Header header;
   struct General general;
-  struct Layers *layers;
-  struct Setup *setup;
-  //struct Stackup stackup;
-  struct Properties *properties;
-  struct Nets *nets;
+  struct Page page;
+  struct Layers layers;
+  struct Setup setup;
+  struct Properties properties;
+  struct Nets nets;
   struct Footprints *footprints;
   struct Graphic *graphic;
   struct Images *images;
@@ -102,28 +130,9 @@ extern struct Board {
   struct Groups *groups;
 } *pcb;
 
-/*
-struct token{
-  char *key;
-  void (*handler)();
-};
-
-struct table{
-  struct token **tokens;
-  struct collision_list **overflow;
-  int size, count;
-};  
-
-struct collision_list{
-  struct token *token;
-  struct collision_list *next;
-};
-*/
-
-
 // Solver
 void free_pcb();  
 
 // Parser
-int open_pcb();
+int open_pcb(const char *path);
 void token_table_init();

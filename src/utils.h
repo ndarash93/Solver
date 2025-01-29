@@ -2,5 +2,5 @@
 
 typedef struct {
     char *chars;
-    uint32_t length;
+    uint64_t length;
 } String;

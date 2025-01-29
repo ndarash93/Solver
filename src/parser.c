@@ -5,10 +5,10 @@
 
 #define BUFF pcb->file_buffer.buffer.chars
 #define INDEX pcb->file_buffer.index
+#define LENGTH pcb->file_buffer.buffer.length
 #define CHAR pcb->file_buffer.buffer.chars[pcb->file_buffer.index]
 
-static void parse_pcb();
-static void parse_header(char *contents);
+// Hash table
 static int token_lookup(const char *token);
 static unsigned long hash(const char *token);
 static struct token *create_token(const char *key, int (*handler)());
@@ -28,6 +28,10 @@ static struct collision_list **create_overflow(struct table *table);
 static void free_overflow(struct table *table);
 static void table_delete(struct table *table, char *key);
 static void handle_value_token(String *token);
+
+// Parsing
+static void parse_pcb();
+static int index_sections(void);
 
 // Handler prototype
 static int handle_version();
@@ -73,7 +77,7 @@ void token_table_init(){
 }
 
 int open_pcb(const char *path){
-  long length, bytes_read;
+  long length, bytes_read = 0;
   char *buffer = NULL;
   FILE *file;
 
@@ -102,16 +106,13 @@ int open_pcb(const char *path){
   pcb->file_buffer.buffer.length = length;
   pcb->file_buffer.index = 0;
 
-  parse_pcb();
+  index_sections();
+  //parse_pcb();
 
 clean_up:
   free(buffer);
   free_table(tokens);
   return SUCCESS;
-}
-
-static void parse_header(char *contents){
-  
 }
 
 static void parse_pcb(){
@@ -157,6 +158,27 @@ static void parse_pcb(){
     }
     INDEX++;
     //printf("Char: %c\n", CHAR);
+  }
+}
+
+static int index_sections(void){
+  int opens = 0;
+  pcb->header.index.set = SECTION_UNSET;
+  pcb->general.index.set = SECTION_UNSET;
+  pcb->page.index.set = SECTION_UNSET;
+  pcb->layers.index.set = SECTION_UNSET;
+  pcb->setup.index.set = SECTION_UNSET;
+  //pcb->stackup.index.set = SECTION_UNSET;
+
+
+  for(INDEX = 0; INDEX < LENGTH; INDEX++){
+    if(CHAR == '('){
+      if(1);
+      opens++;
+    }else if(CHAR == ')'){
+      opens--;
+    }
+    //printf("Opens %d\n", opens);
   }
 }
 
@@ -433,8 +455,8 @@ static void handle_value_token(String *token){
 static int handle_version(){
   String version;
   handle_value_token(&version);
-  pcb->version = version;
-  printf("Found version: %s\n",pcb->version.chars);
+  pcb->header.version = version;
+  printf("Found version: %s\n",pcb->header.version.chars);
   return SUCCESS;
 }
 
@@ -446,16 +468,16 @@ static int handle_kicadpcb(){
 static int handle_generator(){
   String generator;
   handle_value_token(&generator);
-  pcb->generator = generator;
-  printf("Found generator: %s\n",pcb->generator.chars);
+  pcb->header.generator = generator;
+  printf("Found generator: %s\n",pcb->header.generator.chars);
   return SUCCESS;
 }
 
 static int handle_generator_version(){
   String generator_version;
   handle_value_token(&generator_version);
-  pcb->generator_version = generator_version;
-  printf("Found generator version: %s\n", pcb->generator_version.chars);
+  pcb->header.generator_version = generator_version;
+  printf("Found generator version: %s\n", pcb->header.generator_version.chars);
   return SUCCESS;
 }
 
@@ -467,14 +489,14 @@ static int handle_general(){
   }else{
     //struct General *general = malloc(sizeof(struct General));
     //pcb->general;
-    pcb->section.general = 1;
+    //pcb->general = 1;
   }
   return SUCCESS;
 }
 
 static int handle_thickness(){
   //printf("Found thickness\n");
-  if(pcb->opens == 3 && pcb->section.general == OPEN){
+  if(pcb->opens == 3){
     String thickness;
     handle_value_token(&thickness);    
     char *endptr;
@@ -482,18 +504,17 @@ static int handle_thickness(){
     if(thickness.chars == endptr)
       return ERROR;
     printf("Found thickness: %fmm\n", pcb->general.thickness);
-    pcb->section.general = CLOSED;
     return SUCCESS;
   }else{
     printf("Interesting Error10\n");
-    return ERROR;
+    return SUCCESS;
   }
 }
 
 static int handle_paper(){
   String paper;
   handle_value_token(&paper);
-  pcb->paper = paper;
-  printf("Found paper: %s\n", pcb->paper.chars);
+  pcb->page.paper = paper;
+  printf("Found paper: %s\n", pcb->page.paper.chars);
   return SUCCESS;
 }
