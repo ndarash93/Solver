@@ -19,8 +19,8 @@ int main(int argc, char **argv){
 
 
 void free_pcb(){
-  free(pcb->generator.chars);
-  free(pcb->generator_version.chars);
-  free(pcb->paper.chars);
+  free(pcb->header.generator.chars);
+  free(pcb->header.generator_version.chars);
+  free(pcb->page.paper.chars);
   free(pcb);
 }

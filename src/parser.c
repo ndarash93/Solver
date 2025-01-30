@@ -169,7 +169,10 @@ static int index_sections(void){
   pcb->layers.index.set = SECTION_UNSET;
   pcb->setup.index.set = SECTION_UNSET;
   //pcb->stackup.index.set = SECTION_UNSET;
-  pcb->setup.plotsettings.index.set = SECTION_UNSET;
+  pcb->setup.pcbplotparams.index.set = SECTION_UNSET;
+  pcb->nets.index.set = SECTION_UNSET;
+  
+
 
   for(INDEX = 0; INDEX < LENGTH; INDEX++){
     if(CHAR == '('){
