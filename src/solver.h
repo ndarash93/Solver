@@ -15,6 +15,7 @@
 
 #define SECTION_SET 1
 #define SECTION_UNSET 0
+#define SECTION_CLOSED 2
 
 struct Section_Index{
   int set;
@@ -246,7 +247,7 @@ extern struct Board {
   int opens;
 
   // Kicad PCB
-  int kicad_pcb;
+  struct Section_Index kicad_pcb;
 
   // Sections
   struct Header header;

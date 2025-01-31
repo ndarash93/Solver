@@ -10,6 +10,7 @@
 
 static int close;
 static int line_count;
+static int parse_index = 0, end_index = 0;
 
 // Hash table
 static int token_lookup(const char *token);
@@ -33,7 +34,7 @@ static void table_delete(struct table *table, char *key);
 static void handle_value_token(String *token);
 
 // Parsing
-static void parse_pcb(int section_start, int section_end);
+static void parse_pcb();
 static int index_sections(void);
 static String parse_token(uint64_t index);
 
@@ -111,7 +112,7 @@ int open_pcb(const char *path){
   pcb->file_buffer.index = 0;
 
   //index_sections();
-  parse_pcb(0,0);
+  parse_pcb();
 
 clean_up:
   free(buffer);
@@ -168,40 +169,52 @@ static void parse_pcb(){
 }
 */
 
-static void parse_pcb(int section_start, int section_end){
+static void parse_pcb(){
   printf("Parsing PCB\n");
   int opens = 0;
-  if (!section_end){
+  if (!end_index){
     for (INDEX = 0; INDEX < LENGTH; INDEX++){
       if(CHAR == '(')
         opens++;
       else if(CHAR == ')'){
         opens--;
         if(opens == 0)
-          section_end = INDEX;
+          end_index = INDEX;
       }
     }
   }
-  INDEX = section_start;
-  String token = parse_token(section_start);
-  printf("Start: %c | End: %c\n", BUFF[section_start], BUFF[section_end]);
+  printf("Parsing PCB\n");
+  INDEX = parse_index;
+  String token = parse_token(parse_index);
+  printf("Found Token %s\n", token.chars);
+  int (*handler)() = search_token(tokens, token.chars);
+  if (handler && handler() == SUCCESS){
+    printf("SUCCESS\n");
+  }else{
+    printf("Couldn't find: %s\n", token.chars);
+  }
+  while(parse_index < end_index)
+    parse_pcb();
+  free(token.chars);
 }
 
 static String parse_token(uint64_t index){
+  //printf("Parse Token\n");
   int token_index = 0;
   char token[TOKEN_SZ];
-  if(BUFF[index++] != '(')
-    printf("Unexpected token");
-  while(BUFF[index] != ' ' && BUFF[index] != '(' && token_index < TOKEN_SZ-1){
-    if(BUFF[index] == '\n'){
+  if(BUFF[parse_index++] != '(')
+    
+    //printf("Unexpected token");
+  while(BUFF[parse_index] != ' ' && BUFF[parse_index] != '(' && token_index < TOKEN_SZ-1){
+    if(BUFF[parse_index] == '\n'){
       line_count++;
     }
-    else if(BUFF[index] == '\t'){} // Skip over tabs
+    else if(BUFF[parse_index] == '\t'){} // Skip over tabs
     else{
-      token[token_index] = BUFF[index];
+      token[token_index] = BUFF[parse_index];
     }
     token_index++;
-    index++;
+    parse_index++;
   }
   token[token_index] = '\0';
   String val;
@@ -524,8 +537,11 @@ static int handle_version(){
 }
 
 static int handle_kicadpcb(){
-  close = 1;
-  printf("Found kicad_pcb\n");
+  pcb->kicad_pcb.section_start = 0;
+  pcb->kicad_pcb.section_end = end_index;
+  pcb->kicad_pcb.set = SECTION_SET;
+  pcb->header.index.section_start = parse_index;
+  pcb->header.index.set = SECTION_SET;
   return SUCCESS;
 }
 
