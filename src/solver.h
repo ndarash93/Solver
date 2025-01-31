@@ -171,7 +171,7 @@ struct Model{
 
 struct File_Buffer {
   String buffer;
-  uint32_t index;
+  uint64_t index;
 };
 
 struct Graphic {

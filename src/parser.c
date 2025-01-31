@@ -33,8 +33,9 @@ static void table_delete(struct table *table, char *key);
 static void handle_value_token(String *token);
 
 // Parsing
-static void parse_pcb();
+static void parse_pcb(int section_start, int section_end);
 static int index_sections(void);
+static String parse_token(uint64_t index);
 
 // Handler prototype
 static int handle_version();
@@ -109,8 +110,8 @@ int open_pcb(const char *path){
   pcb->file_buffer.buffer.length = length;
   pcb->file_buffer.index = 0;
 
-  index_sections();
-  //parse_pcb();
+  //index_sections();
+  parse_pcb(0,0);
 
 clean_up:
   free(buffer);
@@ -169,20 +170,45 @@ static void parse_pcb(){
 
 static void parse_pcb(int section_start, int section_end){
   printf("Parsing PCB\n");
-  int start, end, opens = 0;
-  int closer = 0;
-  if (CHAR == '('){
-    opens++;
-    start = INDEX;
-  }
-  for(INDEX = section_start; INDEX < section_end; INDEX++){
-    if (CHAR == '('){
-      opens++;
-      start = INDEX;
-    }else if(CHAR == ')'){
-      opens--; 
+  int opens = 0;
+  if (!section_end){
+    for (INDEX = 0; INDEX < LENGTH; INDEX++){
+      if(CHAR == '(')
+        opens++;
+      else if(CHAR == ')'){
+        opens--;
+        if(opens == 0)
+          section_end = INDEX;
+      }
     }
   }
+  INDEX = section_start;
+  String token = parse_token(section_start);
+  printf("Start: %c | End: %c\n", BUFF[section_start], BUFF[section_end]);
+}
+
+static String parse_token(uint64_t index){
+  int token_index = 0;
+  char token[TOKEN_SZ];
+  if(BUFF[index++] != '(')
+    printf("Unexpected token");
+  while(BUFF[index] != ' ' && BUFF[index] != '(' && token_index < TOKEN_SZ-1){
+    if(BUFF[index] == '\n'){
+      line_count++;
+    }
+    else if(BUFF[index] == '\t'){} // Skip over tabs
+    else{
+      token[token_index] = BUFF[index];
+    }
+    token_index++;
+    index++;
+  }
+  token[token_index] = '\0';
+  String val;
+  val.chars = malloc(token_index * sizeof(char));
+  strncpy(val.chars, token, token_index);
+  val.length = token_index;
+  return val;
 }
 
 static int index_sections(void){
