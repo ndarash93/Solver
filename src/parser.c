@@ -8,6 +8,9 @@
 #define LENGTH pcb->file_buffer.buffer.length
 #define CHAR pcb->file_buffer.buffer.chars[pcb->file_buffer.index]
 
+static int close;
+static int line_count;
+
 // Hash table
 static int token_lookup(const char *token);
 static unsigned long hash(const char *token);
@@ -114,7 +117,7 @@ clean_up:
   free_table(tokens);
   return SUCCESS;
 }
-
+/*
 static void parse_pcb(){
   int (*handler)() = NULL;
   char token[TOKEN_SZ];
@@ -134,8 +137,10 @@ static void parse_pcb(){
     }
     else if(CHAR == ' ')
       token_index = 0;
-    else if(CHAR == '\n')
+    else if(CHAR == '\n'){
+      line_count++;
       token_index = 0;
+    }
     else if(CHAR == '\t')
       token_index = 0;
     else{
@@ -160,9 +165,27 @@ static void parse_pcb(){
     //printf("Char: %c\n", CHAR);
   }
 }
+*/
+
+static void parse_pcb(int section_start, int section_end){
+  printf("Parsing PCB\n");
+  int start, end, opens = 0;
+  int closer = 0;
+  if (CHAR == '('){
+    opens++;
+    start = INDEX;
+  }
+  for(INDEX = section_start; INDEX < section_end; INDEX++){
+    if (CHAR == '('){
+      opens++;
+      start = INDEX;
+    }else if(CHAR == ')'){
+      opens--; 
+    }
+  }
+}
 
 static int index_sections(void){
-  int opens = 0;
   pcb->header.index.set = SECTION_UNSET;
   pcb->general.index.set = SECTION_UNSET;
   pcb->page.index.set = SECTION_UNSET;
@@ -171,18 +194,29 @@ static int index_sections(void){
   //pcb->stackup.index.set = SECTION_UNSET;
   pcb->setup.pcbplotparams.index.set = SECTION_UNSET;
   pcb->nets.index.set = SECTION_UNSET;
-  
+  pcb->footprints.index.set = SECTION_UNSET;
+  pcb->graphics.index.set = SECTION_UNSET;
+  pcb->images.index.set = SECTION_UNSET;
+  pcb->tracks.index.set = SECTION_UNSET;
+  pcb->zones.index.set = SECTION_UNSET;
+  pcb->groups.index.set = SECTION_UNSET;
 
+  close = 0;
+  line_count = 0;
 
+  int opens = 0;
+  int new = 0, tab = 0;
+  close = 0;
   for(INDEX = 0; INDEX < LENGTH; INDEX++){
-    if(CHAR == '('){
-      if(1);
-      opens++;
-    }else if(CHAR == ')'){
-      opens--;
+    if(CHAR == '\0'){
+      new++;
+    }else if(CHAR == '\t'){
+      tab--;
     }
-    //printf("Opens %d\n", opens);
   }
+  printf("Line ends: %d, Tabs: %d\n", new, tab);
+  INDEX = 0;
+  return 0;
 }
 
 static unsigned long hash(const char *token){
@@ -464,6 +498,7 @@ static int handle_version(){
 }
 
 static int handle_kicadpcb(){
+  close = 1;
   printf("Found kicad_pcb\n");
   return SUCCESS;
 }

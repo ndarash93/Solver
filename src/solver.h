@@ -20,6 +20,7 @@ struct Section_Index{
   int set;
   uint64_t section_start;
   uint64_t section_end;
+  uint64_t start_line, end_line;
 };
 
 struct Header{
@@ -92,6 +93,10 @@ struct Nets{
   struct Net *net; 
 };
 
+struct at {
+  float x, y, angle;
+};
+
 // https://dev-docs.kicad.org/en/file-formats/sexpr-intro/index.html#_footprint
 struct Footprint {
   struct Section_Index index;
@@ -110,10 +115,7 @@ struct Footprint {
   String path, sheetname, sheetfile, attr;
   struct Line *fp_lines;
   struct Pad *pads;
-};
-
-struct at {
-  float x, y, angle;
+  struct Footprint *prev, *next;
 };
 
 struct Point {
@@ -135,7 +137,7 @@ struct Line {
   struct Stroke {
     float width;
     String type;
-  };
+  } stroke;
   String uuid;
   struct Line *prev, *next;
 };
@@ -154,7 +156,7 @@ struct Line {
 
 struct Pad {
   String num;
-  int type, shape, function, type;
+  int type, shape, function;
   struct at at;
   struct Size size;
   struct Layers layers;
@@ -176,13 +178,19 @@ struct Graphic {
   struct Section_Index index;
 };
 
-struct Image{
+struct Images{
   struct Section_Index index;
 };
 
 struct Tracks{
   struct Section_Index index;
+  struct Track *track;
 };
+
+struct Groups{
+  struct Section_Index index;
+};
+
 
 struct Segment{
   struct Point start, end;
@@ -205,6 +213,17 @@ struct Via{
   struct Layers layers;
   struct Net *net;
   String uuid;
+};
+
+struct Track{
+  struct Section_Index index;
+  int type;
+  union {
+    struct Segment segment;
+    struct Arc arc;
+    struct Via via;
+  } track;
+  struct Track *prev, *next;
 };
 
 struct Zones{
@@ -236,12 +255,12 @@ extern struct Board {
   struct Layers layers;
   struct Setup setup;
   struct Nets nets;
-  struct Footprints *footprints;
-  struct Graphic *graphics;
-  struct Images *images;
-  struct Tracks *tracks;
-  struct Zones *zones;
-  struct Groups *groups;
+  struct Footprint footprints;
+  struct Graphic graphics;
+  struct Images images;
+  struct Tracks tracks;
+  struct Zones zones;
+  struct Groups groups;
 } *pcb;
 
 // Solver
