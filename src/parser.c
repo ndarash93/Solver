@@ -34,9 +34,9 @@ static void table_delete(struct table *table, char *key);
 static void handle_value_token(String *token);
 
 // Parsing
-static void parse_pcb();
+static void parse_pcb(uint64_t start);
 static int index_sections(void);
-static String parse_token(uint64_t index);
+static int parse_token(uint64_t start, uint64_t end, String *token);
 
 // Handler prototype
 static int handle_version();
@@ -112,7 +112,7 @@ int open_pcb(const char *path){
   pcb->file_buffer.index = 0;
 
   //index_sections();
-  parse_pcb();
+  parse_pcb(0);
 
 clean_up:
   free(buffer);
@@ -169,23 +169,36 @@ static void parse_pcb(){
 }
 */
 
-static void parse_pcb(){
-  printf("Parsing PCB\n");
+static void parse_pcb(uint64_t start){
+  printf("Parsing PCB %ld < %ld, %d\n", start, LENGTH, BUFF[start]);
   int opens = 0;
-  if (!end_index){
-    for (INDEX = 0; INDEX < LENGTH; INDEX++){
-      if(CHAR == '(')
-        opens++;
-      else if(CHAR == ')'){
-        opens--;
-        if(opens == 0)
-          end_index = INDEX;
+  uint64_t index = start;
+  uint64_t section_end, next = 0;
+  for (index; index < LENGTH; index++){
+    if(BUFF[index] == '(')
+      opens++;
+    else if(BUFF[index] == ')'){
+      opens--;
+      if(opens == 0){
+        section_end = index;
+        index = start;
+        while(index++ < LENGTH-2){
+          if(BUFF[index] == '('){
+            printf("%ld < %ld\n", index, LENGTH);
+            printf("Index %ld\n", index);
+            break;
+          }
+          else if(index >= LENGTH-2){
+            goto free;
+          }
+        }
+        next = index;
+        break;
       }
     }
   }
-  printf("Parsing PCB\n");
-  INDEX = parse_index;
-  String token = parse_token(parse_index);
+  String token;
+  int error = parse_token(start, section_end, &token);
   printf("Found Token %s\n", token.chars);
   int (*handler)() = search_token(tokens, token.chars);
   if (handler && handler() == SUCCESS){
@@ -193,35 +206,57 @@ static void parse_pcb(){
   }else{
     printf("Couldn't find: %s\n", token.chars);
   }
-  while(parse_index < end_index)
-    parse_pcb();
+  if(next >= LENGTH)
+    next = 0;
+  if (next)
+    parse_pcb(next);
+  
+free:
   free(token.chars);
 }
 
-static String parse_token(uint64_t index){
-  //printf("Parse Token\n");
+static int parse_token(uint64_t start, uint64_t end, String *token){
+  printf("Parse Token\n");
   int token_index = 0;
-  char token[TOKEN_SZ];
-  if(BUFF[parse_index++] != '(')
-    
-    //printf("Unexpected token");
-  while(BUFF[parse_index] != ' ' && BUFF[parse_index] != '(' && token_index < TOKEN_SZ-1){
-    if(BUFF[parse_index] == '\n'){
-      line_count++;
+  char temp_token[TOKEN_SZ];
+  if(BUFF[start++] != '('){
+    printf("Unexpected token");
+    return ERROR;
+  }
+  while(start < end){
+    if(BUFF[start] < 32){
+      //line_count++;
+      //while(BUFF[++start] != '('); // find next open
+      start++;
+      continue;
     }
-    else if(BUFF[parse_index] == '\t'){} // Skip over tabs
+    //else if(BUFF[start] == '\t'){
+      //printf("Got Here\n");
+    //} // Skip over tabs
+    else if (BUFF[start] == ')'){
+      printf("Unexpected close");
+      break;
+    }else if(BUFF[start] == '('){
+      printf("Very unexpected error\n");
+      break;
+      //return ERROR;
+    }else if (BUFF[start] == ' '){
+      printf("Got Here\n");
+      break;
+    }
     else{
-      token[token_index] = BUFF[parse_index];
+      temp_token[token_index] = BUFF[start];
     }
     token_index++;
-    parse_index++;
+    start++;
   }
-  token[token_index] = '\0';
-  String val;
-  val.chars = malloc(token_index * sizeof(char));
-  strncpy(val.chars, token, token_index);
-  val.length = token_index;
-  return val;
+  printf("Got Here\n");
+  temp_token[token_index++] = 0;
+  printf("TEMP: %s, INDES: %d\n", temp_token, token_index);
+  token->chars = malloc(token_index * sizeof(char));
+  strncpy(token->chars, temp_token, token_index);
+  token->length = token_index;
+  return SUCCESS;
 }
 
 static int index_sections(void){
@@ -537,6 +572,7 @@ static int handle_version(){
 }
 
 static int handle_kicadpcb(){
+  printf("Handling PCB\n");
   pcb->kicad_pcb.section_start = 0;
   pcb->kicad_pcb.section_end = end_index;
   pcb->kicad_pcb.set = SECTION_SET;
