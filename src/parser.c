@@ -15,11 +15,11 @@ static int parse_index = 0, end_index = 0;
 // Hash table
 static int token_lookup(const char *token);
 static unsigned long hash(const char *token);
-static struct token *create_token(const char *key, int (*handler)());
+static struct token *create_token(const char *key, int* (*handler)());
 static struct table *create_table(int size);
 static void free_token(struct token *token);
 static void free_table(struct table *table);
-static void insert(struct table *table, char* key, int (*handler)());
+static void insert(struct table *table, char* key, int* (*handler)());
 static void *search_token(struct table *table, char* key);
 static void print_table(struct table *table);
 static void handle_collision(struct table *table, unsigned long index, struct token *token);
@@ -35,22 +35,21 @@ static void handle_value_token(String *token);
 
 // Parsing
 static void parse_pcb(uint64_t start, uint64_t end);
-static int index_sections(void);
 static int parse_token(uint64_t start, uint64_t end, String *token);
 
 // Handler prototype
-static int handle_version(uint64_t *start, uint64_t end);
-static int handle_kicadpcb(uint64_t *start, uint64_t end);
-static int handle_generator(uint64_t *start, uint64_t end);
-static int handle_generator_version(uint64_t *start, uint64_t end);
-static int handle_general(uint64_t *start, uint64_t end);
-static int handle_thickness(uint64_t *start, uint64_t end);
-static int handle_paper(uint64_t *start, uint64_t end);
-static int handle_layers(uint64_t *start, uint64_t end);
+static int *handle_version(uint64_t *start, uint64_t end);
+static int *handle_kicadpcb(uint64_t *start, uint64_t end);
+static int *handle_generator(uint64_t *start, uint64_t end);
+static int *handle_generator_version(uint64_t *start, uint64_t end);
+static int *handle_general(uint64_t *start, uint64_t end);
+static int *handle_thickness(uint64_t *start, uint64_t end);
+static int *handle_paper(uint64_t *start, uint64_t end);
+static int *handle_layers(uint64_t *start, uint64_t end);
 
 struct token{
   char *key;
-  int (*handler)();
+  int* (*handler)();
 };
 
 struct table{
@@ -120,9 +119,22 @@ clean_up:
 
 static void parse_pcb(uint64_t start, uint64_t end){
   uint64_t opens = 0;
-  uint64_t index = start, next = 0, new_start = start, new_end;
+  uint64_t index = start, new_start = start, new_end;
+  int *section_set = NULL;
   end = (end ? end : LENGTH);
   new_end = end;
+  
+  String token;
+  if(parse_token(start, end, &token) == ERROR){
+    //printf("ERROR\n");
+  }
+  //printf("Found token %s\n", token.chars);
+  int* (*handler)(uint64_t*, uint64_t) = search_token(tokens, token.chars);
+  if(handler){
+    section_set = handler(&start, end);
+    //printf("SUCCESS\n");
+  }
+  
   while(index < end){
     if(BUFF[index] == '('){
       if(!opens){
@@ -137,7 +149,7 @@ static void parse_pcb(uint64_t start, uint64_t end){
         parse_pcb(new_start, new_end);
         while(++index < end){
           if(BUFF[index] == '('){
-            printf("NEXT\n");
+            //printf("NEXT\n");
             parse_pcb(index, end);
             break;
           }
@@ -148,20 +160,13 @@ static void parse_pcb(uint64_t start, uint64_t end){
     index++;
   }
 
-  String token;
-  int error = parse_token(new_start, new_end, &token);
-  printf("Found Token %s\n", token.chars);
-  int (*handler)() = search_token(tokens, token.chars);
-  if (handler && handler(&new_start, new_end) == SUCCESS){
-    printf("SUCCESS\n");
-  }else{
-    //printf("Couldn't find: %s\n", token.chars);
+  if(section_set){
+    *section_set = SECTION_CLOSED;
   }
-
   free(token.chars);
   
 
-  printf("Char start: %c(%ld), Char end: %c(%ld)\n", BUFF[new_start], new_start, BUFF[new_end], new_end);
+  //printf("Char start: %c(%ld), Char end: %c(%ld)\n", BUFF[new_start], new_start, BUFF[new_end], new_end);
 }
 
 static int parse_token(uint64_t start, uint64_t end, String *token){
@@ -201,45 +206,11 @@ static int parse_token(uint64_t start, uint64_t end, String *token){
   }
   //printf("Got Here\n");
   temp_token[token_index++] = 0;
-  printf("TEMP: %s, INDEX: %d\n", temp_token, token_index);
+  //printf("TEMP: %s, INDEX: %d\n", temp_token, token_index);
   token->chars = malloc(token_index * sizeof(char));
   strncpy(token->chars, temp_token, token_index);
   token->length = token_index;
   return SUCCESS;
-}
-
-static int index_sections(void){
-  pcb->header.index.set = SECTION_UNSET;
-  pcb->general.index.set = SECTION_UNSET;
-  pcb->page.index.set = SECTION_UNSET;
-  pcb->layers.index.set = SECTION_UNSET;
-  pcb->setup.index.set = SECTION_UNSET;
-  //pcb->stackup.index.set = SECTION_UNSET;
-  pcb->setup.pcbplotparams.index.set = SECTION_UNSET;
-  pcb->nets.index.set = SECTION_UNSET;
-  pcb->footprints.index.set = SECTION_UNSET;
-  pcb->graphics.index.set = SECTION_UNSET;
-  pcb->images.index.set = SECTION_UNSET;
-  pcb->tracks.index.set = SECTION_UNSET;
-  pcb->zones.index.set = SECTION_UNSET;
-  pcb->groups.index.set = SECTION_UNSET;
-
-  close = 0;
-  line_count = 0;
-
-  //int opens = 0;
-  int new = 0, tab = 0;
-  close = 0;
-  for(INDEX = 0; INDEX < LENGTH; INDEX++){
-    if(CHAR == '\0'){
-      new++;
-    }else if(CHAR == '\t'){
-      tab--;
-    }
-  }
-  printf("Line ends: %d, Tabs: %d\n", new, tab);
-  INDEX = 0;
-  return 0;
 }
 
 static unsigned long hash(const char *token){
@@ -251,7 +222,7 @@ static unsigned long hash(const char *token){
 }
 
 
-static struct token *create_token(const char *key, int (*handler)()){
+static struct token *create_token(const char *key, int* (*handler)()){
   struct token *token = (struct token *) malloc(sizeof(struct token));
   token->key = (char*) malloc(strlen(key) + 1);
   strcpy(token->key, key);
@@ -290,7 +261,7 @@ static void free_table(struct table *table){
   free(table);
 }
 
-static void insert(struct table *table, char* key, int (*handler)()){
+static void insert(struct table *table, char* key, int* (*handler)()){
   struct token *token = create_token(key, handler);
   int index = hash(key);
   struct token *current = table->tokens[index];
@@ -511,57 +482,63 @@ static void handle_value_token(String *token){
   token->length = token_index;
 }
 
-// Handle Token Functions
-static int handle_version(uint64_t *start, uint64_t end){
-  String version;
-  handle_value_token(&version);
-  pcb->header.version = version;
-  printf("Found version: %s\n",pcb->header.version.chars);
-  return SUCCESS;
-}
-
-static int handle_kicadpcb(uint64_t *start, uint64_t end){
+static int *handle_kicadpcb(uint64_t *start, uint64_t end){
   printf("Handling PCB\n");
   pcb->kicad_pcb.section_start = *start;
   pcb->kicad_pcb.section_end = end;
   pcb->kicad_pcb.set = SECTION_SET;
   pcb->header.index.section_start = parse_index;
   pcb->header.index.set = SECTION_SET;
-  return SUCCESS;
+  return &pcb->header.index.set;
 }
 
-static int handle_generator(uint64_t *start, uint64_t end){
+// Handle Token Functions
+static int *handle_version(uint64_t *start, uint64_t end){
+  String version;
+  if(pcb->header.index.set == SECTION_SET){
+    handle_value_token(&version);
+    pcb->header.version = version;
+    printf("Found version: %s\n",pcb->header.version.chars);
+    return NULL;
+  }
+  return NULL;
+}
+
+static int *handle_generator(uint64_t *start, uint64_t end){
   String generator;
-  handle_value_token(&generator);
-  pcb->header.generator = generator;
-  printf("Found generator: %s\n",pcb->header.generator.chars);
-  return SUCCESS;
+  if(pcb->header.index.set == SECTION_SET){
+    handle_value_token(&generator);
+    pcb->header.generator = generator;
+    printf("Found generator: %s\n",pcb->header.generator.chars);
+    return NULL;
+  }
+  return NULL;
 }
 
-static int handle_generator_version(uint64_t *start, uint64_t end){
+static int *handle_generator_version(uint64_t *start, uint64_t end){
   String generator_version;
   handle_value_token(&generator_version);
   pcb->header.generator_version = generator_version;
   printf("Found generator version: %s\n", pcb->header.generator_version.chars);
-  return SUCCESS;
+  return NULL;
 }
 
-static int handle_general(uint64_t *start, uint64_t end){
+static int *handle_general(uint64_t *start, uint64_t end){
   printf("Found general\n");
   if(pcb->header.index.set == SECTION_SET){
     //pcb->header.index.set == SECTION_CLOSED;
     pcb->general.index.set = SECTION_SET;
-    return SUCCESS;
+    return NULL;
   }else{
     //struct General *general = malloc(sizeof(struct General));
     //pcb->general;
     //pcb->general = 1;
     //return ERROR;
   }
-  return ERROR;
+  return NULL;
 }
 
-static int handle_thickness(uint64_t *start, uint64_t end){
+static int *handle_thickness(uint64_t *start, uint64_t end){
   //printf("Found thickness\n");
   if(pcb->opens == 3){
     String thickness;
@@ -569,25 +546,25 @@ static int handle_thickness(uint64_t *start, uint64_t end){
     char *endptr;
     pcb->general.thickness = strtof(thickness.chars, &endptr);
     if(thickness.chars == endptr)
-      return ERROR;
+      return NULL;
     printf("Found thickness: %fmm\n", pcb->general.thickness);
-    return SUCCESS;
+    return NULL;
   }else{
     printf("Interesting Error10\n");
-    return SUCCESS;
+    return NULL;
   }
 }
 
-static int handle_paper(uint64_t *start, uint64_t end){
+static int *handle_paper(uint64_t *start, uint64_t end){
   String paper;
   handle_value_token(&paper);
   pcb->page.paper = paper;
   printf("Found paper: %s\n", pcb->page.paper.chars);
-  return SUCCESS;
+  return NULL;
 }
 
-static int handle_layers(uint64_t *start, uint64_t end){
+static int *handle_layers(uint64_t *start, uint64_t end){
   printf("Handle Layers\n");
   printf("Start: %c, End: %c\n", BUFF[*start], BUFF[end]);
-  return SUCCESS;
+  return NULL;
 }
