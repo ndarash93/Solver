@@ -132,7 +132,6 @@ static void parse_pcb(uint64_t start, uint64_t end){
     }else if(BUFF[index] == ')'){
       opens--;
       if(opens == 0){
-        printf("CLOSED: %ld\n", index);
         new_end = index;
         index = new_start;
         parse_pcb(new_start, new_end);
@@ -149,13 +148,24 @@ static void parse_pcb(uint64_t start, uint64_t end){
     index++;
   }
 
+  String token;
+  int error = parse_token(new_start, new_end, &token);
+  printf("Found Token %s\n", token.chars);
+  int (*handler)() = search_token(tokens, token.chars);
+  if (handler && handler(&new_start, new_end) == SUCCESS){
+    printf("SUCCESS\n");
+  }else{
+    //printf("Couldn't find: %s\n", token.chars);
+  }
+
+  free(token.chars);
   
 
   printf("Char start: %c(%ld), Char end: %c(%ld)\n", BUFF[new_start], new_start, BUFF[new_end], new_end);
 }
 
 static int parse_token(uint64_t start, uint64_t end, String *token){
-  printf("Parse Token\n");
+  //printf("Parse Token\n");
   int token_index = 0;
   char temp_token[TOKEN_SZ];
   if(BUFF[start++] != '('){
@@ -191,7 +201,7 @@ static int parse_token(uint64_t start, uint64_t end, String *token){
   }
   //printf("Got Here\n");
   temp_token[token_index++] = 0;
-  printf("TEMP: %s, INDES: %d\n", temp_token, token_index);
+  printf("TEMP: %s, INDEX: %d\n", temp_token, token_index);
   token->chars = malloc(token_index * sizeof(char));
   strncpy(token->chars, temp_token, token_index);
   token->length = token_index;
