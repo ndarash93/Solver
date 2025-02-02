@@ -170,7 +170,7 @@ static void parse_pcb(){
 */
 
 static void parse_pcb(uint64_t start){
-  printf("Parsing PCB %ld < %ld, %d\n", start, LENGTH, BUFF[start]);
+  //printf("Parsing PCB %ld < %ld, %d\n", start, LENGTH, BUFF[start]);
   int opens = 0;
   uint64_t index = start;
   uint64_t section_end, next = 0;
@@ -182,13 +182,14 @@ static void parse_pcb(uint64_t start){
       if(opens == 0){
         section_end = index;
         index = start;
-        while(index++ < LENGTH-2){
+        while(index++ < LENGTH){
           if(BUFF[index] == '('){
-            printf("%ld < %ld\n", index, LENGTH);
-            printf("Index %ld\n", index);
+            //printf("%ld < %ld\n", index, LENGTH);
+            //printf("Index %ld\n", index);
             break;
           }
-          else if(index >= LENGTH-2){
+          else if(index >= LENGTH){
+            printf("End of board file\n");
             goto free;
           }
         }
@@ -202,9 +203,9 @@ static void parse_pcb(uint64_t start){
   printf("Found Token %s\n", token.chars);
   int (*handler)() = search_token(tokens, token.chars);
   if (handler && handler() == SUCCESS){
-    printf("SUCCESS\n");
+    //printf("SUCCESS\n");
   }else{
-    printf("Couldn't find: %s\n", token.chars);
+    //printf("Couldn't find: %s\n", token.chars);
   }
   if(next >= LENGTH)
     next = 0;
@@ -216,11 +217,11 @@ free:
 }
 
 static int parse_token(uint64_t start, uint64_t end, String *token){
-  printf("Parse Token\n");
+  //printf("Parse Token\n");
   int token_index = 0;
   char temp_token[TOKEN_SZ];
   if(BUFF[start++] != '('){
-    printf("Unexpected token");
+    //printf("Unexpected token");
     return ERROR;
   }
   while(start < end){
@@ -234,14 +235,14 @@ static int parse_token(uint64_t start, uint64_t end, String *token){
       //printf("Got Here\n");
     //} // Skip over tabs
     else if (BUFF[start] == ')'){
-      printf("Unexpected close");
+      //printf("Unexpected close");
       break;
     }else if(BUFF[start] == '('){
-      printf("Very unexpected error\n");
+      //printf("Very unexpected error\n");
       break;
       //return ERROR;
     }else if (BUFF[start] == ' '){
-      printf("Got Here\n");
+      //printf("Got Here\n");
       break;
     }
     else{
@@ -250,9 +251,9 @@ static int parse_token(uint64_t start, uint64_t end, String *token){
     token_index++;
     start++;
   }
-  printf("Got Here\n");
+  //printf("Got Here\n");
   temp_token[token_index++] = 0;
-  printf("TEMP: %s, INDES: %d\n", temp_token, token_index);
+  //printf("TEMP: %s, INDES: %d\n", temp_token, token_index);
   token->chars = malloc(token_index * sizeof(char));
   strncpy(token->chars, temp_token, token_index);
   token->length = token_index;
@@ -573,8 +574,8 @@ static int handle_version(){
 
 static int handle_kicadpcb(){
   printf("Handling PCB\n");
-  pcb->kicad_pcb.section_start = 0;
-  pcb->kicad_pcb.section_end = end_index;
+  //pcb->kicad_pcb.section_start = 0;
+  //pcb->kicad_pcb.section_end = end_index;
   pcb->kicad_pcb.set = SECTION_SET;
   pcb->header.index.section_start = parse_index;
   pcb->header.index.set = SECTION_SET;
@@ -599,15 +600,17 @@ static int handle_generator_version(){
 
 static int handle_general(){
   printf("Found general\n");
-  if(pcb->opens != 2){
-    printf("Interesting Error\n");
-    return ERROR;
+  if(pcb->header.index.set == SECTION_SET){
+    //pcb->header.index.set == SECTION_CLOSED;
+    pcb->general.index.set = SECTION_SET;
+    return SUCCESS;
   }else{
     //struct General *general = malloc(sizeof(struct General));
     //pcb->general;
     //pcb->general = 1;
+    //return ERROR;
   }
-  return SUCCESS;
+  return ERROR;
 }
 
 static int handle_thickness(){
