@@ -38,14 +38,17 @@ static void parse_pcb(uint64_t start, uint64_t end);
 static int parse_token(uint64_t start, uint64_t end, String *token);
 
 // Handler prototype
-static int *handle_version(uint64_t *start, uint64_t end);
-static int *handle_kicadpcb(uint64_t *start, uint64_t end);
-static int *handle_generator(uint64_t *start, uint64_t end);
-static int *handle_generator_version(uint64_t *start, uint64_t end);
-static int *handle_general(uint64_t *start, uint64_t end);
-static int *handle_thickness(uint64_t *start, uint64_t end);
-static int *handle_paper(uint64_t *start, uint64_t end);
-static int *handle_layers(uint64_t *start, uint64_t end);
+static int *handle_version(uint64_t start, uint64_t end);
+static int *handle_kicadpcb(uint64_t start, uint64_t end);
+static int *handle_generator(uint64_t start, uint64_t end);
+static int *handle_generator_version(uint64_t start, uint64_t end);
+static int *handle_general(uint64_t start, uint64_t end);
+static int *handle_thickness(uint64_t start, uint64_t end);
+static int *handle_paper(uint64_t start, uint64_t end);
+static int *handle_layers(uint64_t start, uint64_t end);
+
+// Handler Helpers
+static int handle_quotes(uint64_t *start, uint64_t end, String *quote);
 
 struct token{
   char *key;
@@ -469,6 +472,7 @@ static void table_delete(struct table *table, char *key){
   }
 }
 
+// Handle helpers
 static void handle_value_token(String *token){
   char val[TOKEN_SZ];
   int token_index = 0;
@@ -482,18 +486,42 @@ static void handle_value_token(String *token){
   token->length = token_index;
 }
 
-static int *handle_kicadpcb(uint64_t *start, uint64_t end){
+static int handle_quotes(uint64_t *start, uint64_t end, String *quote){
+  uint64_t index = *start;
+  int token_index = 0;
+  char token[TOKEN_SZ];
+  if(BUFF[index] != '\"'){
+    printf("Weird weird\n");
+    return ERROR;
+  }
+  while(++index < end){
+    token[token_index++] = BUFF[index];
+    if(BUFF[index] == '\"'){
+      *start = index;
+      token[token_index] = 0;
+      if(quote){
+        quote->chars = malloc(token_index * sizeof(char));
+        strncpy(quote->chars, token, token_index);
+        quote->length = token_index;
+      }
+      return SUCCESS;
+    }
+  }
+  return ERROR;
+}
+
+static int *handle_kicadpcb(uint64_t start, uint64_t end){
   printf("Handling PCB\n");
-  pcb->kicad_pcb.section_start = *start;
+  pcb->kicad_pcb.section_start = start;
   pcb->kicad_pcb.section_end = end;
   pcb->kicad_pcb.set = SECTION_SET;
   pcb->header.index.section_start = parse_index;
   pcb->header.index.set = SECTION_SET;
-  return &pcb->header.index.set;
+  return &pcb->kicad_pcb.set;
 }
 
 // Handle Token Functions
-static int *handle_version(uint64_t *start, uint64_t end){
+static int *handle_version(uint64_t start, uint64_t end){
   String version;
   if(pcb->header.index.set == SECTION_SET){
     handle_value_token(&version);
@@ -504,7 +532,7 @@ static int *handle_version(uint64_t *start, uint64_t end){
   return NULL;
 }
 
-static int *handle_generator(uint64_t *start, uint64_t end){
+static int *handle_generator(uint64_t start, uint64_t end){
   String generator;
   if(pcb->header.index.set == SECTION_SET){
     handle_value_token(&generator);
@@ -515,37 +543,34 @@ static int *handle_generator(uint64_t *start, uint64_t end){
   return NULL;
 }
 
-static int *handle_generator_version(uint64_t *start, uint64_t end){
-  String generator_version;
-  handle_value_token(&generator_version);
-  pcb->header.generator_version = generator_version;
-  printf("Found generator version: %s\n", pcb->header.generator_version.chars);
-  return NULL;
-}
-
-static int *handle_general(uint64_t *start, uint64_t end){
-  printf("Found general\n");
+static int *handle_generator_version(uint64_t start, uint64_t end){
   if(pcb->header.index.set == SECTION_SET){
-    //pcb->header.index.set == SECTION_CLOSED;
-    pcb->general.index.set = SECTION_SET;
-    return NULL;
-  }else{
-    //struct General *general = malloc(sizeof(struct General));
-    //pcb->general;
-    //pcb->general = 1;
-    //return ERROR;
+    String generator_version;
+    handle_value_token(&generator_version);
+    pcb->header.generator_version = generator_version;
+    printf("Found generator version: %s\n", pcb->header.generator_version.chars);
+    return &pcb->header.index.set;
   }
   return NULL;
 }
 
-static int *handle_thickness(uint64_t *start, uint64_t end){
-  //printf("Found thickness\n");
-  if(pcb->opens == 3){
+static int *handle_general(uint64_t start, uint64_t end){
+  if(pcb->header.index.set == SECTION_SET){
+    printf("Found general\n");
+    pcb->general.index.set = SECTION_SET;
+    return &pcb->general.index.set;
+  }
+  return NULL;
+}
+
+static int *handle_thickness(uint64_t start, uint64_t end){
+  if(pcb->general.index.set == SECTION_SET){
     String thickness;
     handle_value_token(&thickness);    
     char *endptr;
     pcb->general.thickness = strtof(thickness.chars, &endptr);
     if(thickness.chars == endptr)
+      printf("Float Error\n");
       return NULL;
     printf("Found thickness: %fmm\n", pcb->general.thickness);
     return NULL;
@@ -555,16 +580,41 @@ static int *handle_thickness(uint64_t *start, uint64_t end){
   }
 }
 
-static int *handle_paper(uint64_t *start, uint64_t end){
-  String paper;
-  handle_value_token(&paper);
-  pcb->page.paper = paper;
-  printf("Found paper: %s\n", pcb->page.paper.chars);
+static int *handle_paper(uint64_t start, uint64_t end){
+  if(pcb->general.index.set == SECTION_CLOSED){
+    pcb->page.index.set = SECTION_SET;
+    String paper;
+    handle_value_token(&paper);
+    pcb->page.paper = paper;
+    printf("Found paper: %s\n", pcb->page.paper.chars);
+    return &pcb->page.index.set;
+  }
   return NULL;
 }
 
-static int *handle_layers(uint64_t *start, uint64_t end){
-  printf("Handle Layers\n");
-  printf("Start: %c, End: %c\n", BUFF[*start], BUFF[end]);
+static int *handle_layers(uint64_t start, uint64_t end){
+  printf("Layers start charater %c\n", BUFF[start]);
+  //start++;
+  if(pcb->page.index.set == SECTION_CLOSED){
+    int opens = 0;
+    uint64_t layer_start, layer_end, next;
+    pcb->layers.index.set == SECTION_SET;
+    while(++start < end){
+      if(BUFF[start] == '\"'){
+        handle_quotes(&start, end, NULL);
+      }
+      if(BUFF[start] == '('){
+        layer_start = start;
+        opens++;
+      }else if(BUFF[start] == ')'){
+        opens--;
+        layer_end = start;
+        if(opens != 0){
+          printf("WTF\n");
+        }
+      }
+    }
+    return &pcb->layers.index.set;
+  }
   return NULL;
 }
