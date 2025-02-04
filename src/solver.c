@@ -1,5 +1,7 @@
 #include "solver.h"
 
+static void print_pcb();
+
 struct Board *pcb;
 
 int main(int argc, char **argv){
@@ -12,6 +14,8 @@ int main(int argc, char **argv){
   token_table_init();
   open_pcb(argv[1]);
   
+  //print_pcb();
+
   free_pcb();
 
   return EXIT_SUCCESS;
@@ -23,4 +27,8 @@ void free_pcb(){
   free(pcb->header.generator_version.chars);
   free(pcb->page.paper.chars);
   free(pcb);
+}
+
+static void print_pcb(){
+  //printf();
 }
