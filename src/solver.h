@@ -23,6 +23,13 @@
 #define LAYER_TYPE_SIGNAL 4
 #define LAYER_TYPE_USER 5
 
+#define FREE(temp, list) \
+while(list){ \
+  temp = list; \
+  list = list->next; \
+  free(temp);\
+}
+
 struct Section_Index{
   int set;
   uint64_t section_start;
@@ -90,8 +97,10 @@ struct Setup {
 };
 
 struct Net {
+  struct Section_Index index;
   int ordinal;
   String name;
+  struct Net *next, *prev;
 };
 
 struct Nets{
@@ -261,12 +270,12 @@ extern struct Board {
   struct Page page;
   struct Layers layers;
   struct Setup setup;
-  struct Nets nets;
-  struct Footprint footprints;
+  struct Net *nets;
+  struct Footprint *footprints;
   struct Graphic graphics;
   struct Images images;
-  struct Tracks tracks;
-  struct Zones zones;
+  struct Tracks *tracks;
+  struct Zones *zones;
   struct Groups groups;
 } *pcb;
 

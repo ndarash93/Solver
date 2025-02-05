@@ -15,7 +15,9 @@ int main(int argc, char **argv){
   open_pcb(argv[1]);
   
   //print_pcb();
-
+  for (struct Net *temp = pcb->nets; temp; temp = temp->next){
+      printf("(\n\tNet: %p,\n\tOrdinal: %d,\n\tName: \"%s\",\n\tnext: %p,\n\tprev: %p\n)\n", temp, temp->ordinal, temp->name.chars, temp->next, temp->prev);
+    }
   free_pcb();
 
   return EXIT_SUCCESS;
@@ -23,15 +25,19 @@ int main(int argc, char **argv){
 
 
 void free_pcb(){
-  struct Layer *temp, *layer = pcb->layers.layer;
+  struct Layer *temp_layer, *layer = pcb->layers.layer;
+  struct Net *temp_net, *net = pcb->nets;
   free(pcb->header.generator.chars);
   free(pcb->header.generator_version.chars);
   free(pcb->page.paper.chars);
-  while(layer){
+  /*while(layer){
     temp = layer;
     layer = layer->next;
     free(temp);
-  }
+  }*/
+  FREE(temp_layer, layer);
+  FREE(temp_net, net);
+
   free(pcb);
 }
 

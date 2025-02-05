@@ -8,6 +8,8 @@
 #define LENGTH pcb->file_buffer.buffer.length
 #define CHAR pcb->file_buffer.buffer.chars[pcb->file_buffer.index]
 
+#define COPY(token, index, buff) (token[(index++)] = BUFF[(buff++)])
+
 // Hash table
 static int token_lookup(const char *token);
 static unsigned long hash(const char *token);
@@ -50,6 +52,8 @@ static int *handle_pad_to_paste_clearance(uint64_t start, uint64_t end);
 static int *handle_pad_to_paste_clearance_ratio(uint64_t start, uint64_t end);
 static int *handle_pcbplotparams(uint64_t start, uint64_t end);
 
+static int *handle_net(uint64_t start, uint64_t end);
+
 // Handler Helpers
 static int handle_quotes(uint64_t *start, uint64_t end, String *quote);
 static void set_section_index(uint64_t start, uint64_t end, struct Section_Index *index);
@@ -84,13 +88,13 @@ void token_table_init(){
   insert(tokens, (char *)"thickness", handle_thickness);
   insert(tokens, (char *)"paper", handle_paper);
   insert(tokens, (char *)"layers", handle_layers);
-
   insert(tokens, (char *)"setup", handle_setup);
   insert(tokens, (char *)"pad_to_mask_clearance", handle_pad_to_mask_clearance);
   insert(tokens, (char *)"solder_mask_min_width", handle_solder_mask_min_width);
   insert(tokens, (char *)"pad_to_paste_clearance", handle_pad_to_paste_clearance);
   insert(tokens, (char *)"pad_to_paste_clearance_ratio", handle_pad_to_paste_clearance_ratio);
   insert(tokens, (char *)"pcbplotparams", handle_pcbplotparams);
+  insert(tokens, (char *)"net", handle_net);
 }
 
 int open_pcb(const char *path){
@@ -504,9 +508,9 @@ static int handle_quotes(uint64_t *start, uint64_t end, String *quote){
     if(BUFF[index] == '\"'){
       break;
     }
-    token[token_index] = BUFF[index];
-    token_index++;
-    index++;
+    token[token_index++] = BUFF[index++];
+    //token_index++;
+    //index++;
   }
   token[token_index++] = 0;
   *start = ++index;
@@ -800,52 +804,60 @@ static int *handle_pcbplotparams(uint64_t start, uint64_t end){
     pcb->setup.pcbplotparams.index.section_start = start;
     pcb->setup.pcbplotparams.index.section_end = end;
     pcb->setup.pcbplotparams.index.set = SECTION_SET;
-
+    // Maybe implement later i dont think we care
     return &pcb->setup.pcbplotparams.index.set;
   }
   return NULL;
 }
 
-/*
-(setup
-  (pad_to_mask_clearance 0) done
-  (allow_soldermask_bridges_in_footprints no)
-  (pcbplotparams
-    (layerselection 0x00010fc_ffffffff)
-    (plot_on_all_layers_selection 0x0000000_00000000)
-    (disableapertmacros no)
-    (usegerberextensions no)
-    (usegerberattributes yes)
-    (usegerberadvancedattributes yes)
-    (creategerberjobfile yes)
-    (dashed_line_dash_ratio 12.000000)
-    (dashed_line_gap_ratio 3.000000)
-    (svgprecision 4)
-    (plotframeref no)
-    (viasonmask no)
-    (mode 1)
-    (useauxorigin no)
-    (hpglpennumber 1)
-    (hpglpenspeed 20)
-    (hpglpendiameter 15.000000)
-    (pdf_front_fp_property_popups yes)
-    (pdf_back_fp_property_popups yes)
-    (dxfpolygonmode yes)
-    (dxfimperialunits yes)
-    (dxfusepcbnewfont yes)
-    (psnegative no)
-    (psa4output no)
-    (plotreference yes)
-    (plotvalue yes)
-    (plotfptext yes)
-    (plotinvisibletext no)
-    (sketchpadsonfab no)
-    (subtractmaskfromsilk no)
-    (outputformat 1)
-    (mirror no)
-    (drillshape 1)
-    (scaleselection 1)
-    (outputdirectory "")
-  )
-)
-*/
+static int *handle_net(uint64_t start, uint64_t end){
+  if(pcb->footprints){
+  
+  }else if(pcb->tracks){
+
+  }else if (pcb->zones){
+
+  }else{
+    char s_ordinal[TOKEN_SZ];
+    int ordinal_index = 0;
+    String name;
+    while(start < end){
+      while(BUFF[start++] != ' ');
+      while(BUFF[start++] != ' '){
+        COPY(s_ordinal, ordinal_index, start);
+      }
+      if(BUFF[start] == '\"'){
+        handle_quotes(&start, end, &name);
+      }
+    }
+    struct Net *net = malloc(sizeof(struct Net));
+    net->index.section_start = start;
+    net->index.section_end = end;
+    net->index.set = SECTION_SET;
+    net->name = name;
+    net->ordinal = atoi(s_ordinal);
+    net->next = NULL;
+    net->prev = NULL;
+
+    s_ordinal[ordinal_index++] = '\0';
+    //printf("%s\n", s_ordinal);
+    if(pcb->nets == NULL){
+      pcb->nets = net;
+    }else{
+      pcb->nets->prev = net;
+      net->next = pcb->nets;
+      pcb->nets = net;
+    }
+    return &net->index.set;
+  }
+  return NULL;
+}
+
+static int *handle_footprint(uint64_t start, uint64_t end){
+  struct Footprint *footprint = malloc(sizeof( struct Footprint));
+  pcb->setup.pcbplotparams.index.section_start = start;
+  pcb->setup.pcbplotparams.index.section_end = end;
+  pcb->setup.pcbplotparams.index.set = SECTION_SET;
+    // Maybe implement later i dont think we care
+  return &pcb->setup.pcbplotparams.index.set;
+}
