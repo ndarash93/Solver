@@ -5,8 +5,8 @@ static void print_pcb();
 struct Board *pcb;
 
 int main(int argc, char **argv){
-  pcb = malloc(sizeof(struct Board));
-  
+  //pcb = malloc(sizeof(struct Board));
+  pcb = calloc(1, sizeof(struct Board));
   if (argc < 2){
     printf("No file specified\n");
     return EXIT_FAILURE;
@@ -23,9 +23,15 @@ int main(int argc, char **argv){
 
 
 void free_pcb(){
+  struct Layer *temp, *layer = pcb->layers.layer;
   free(pcb->header.generator.chars);
   free(pcb->header.generator_version.chars);
   free(pcb->page.paper.chars);
+  while(layer){
+    temp = layer;
+    layer = layer->next;
+    free(temp);
+  }
   free(pcb);
 }
 

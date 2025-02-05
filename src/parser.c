@@ -8,10 +8,6 @@
 #define LENGTH pcb->file_buffer.buffer.length
 #define CHAR pcb->file_buffer.buffer.chars[pcb->file_buffer.index]
 
-static int close;
-static int line_count;
-static int parse_index = 0, end_index = 0;
-
 // Hash table
 static int token_lookup(const char *token);
 static unsigned long hash(const char *token);
@@ -47,6 +43,13 @@ static int *handle_paper(uint64_t start, uint64_t end);
 static int *handle_layers(uint64_t start, uint64_t end);
 static int *handle_layer(uint64_t start, uint64_t end);
 
+static int *handle_setup(uint64_t start, uint64_t end);
+static int *handle_pad_to_mask_clearance(uint64_t start, uint64_t end);
+static int *handle_solder_mask_min_width(uint64_t start, uint64_t end);
+static int *handle_pad_to_paste_clearance(uint64_t start, uint64_t end);
+static int *handle_pad_to_paste_clearance_ratio(uint64_t start, uint64_t end);
+static int *handle_pcbplotparams(uint64_t start, uint64_t end);
+
 // Handler Helpers
 static int handle_quotes(uint64_t *start, uint64_t end, String *quote);
 static void set_section_index(uint64_t start, uint64_t end, struct Section_Index *index);
@@ -81,6 +84,13 @@ void token_table_init(){
   insert(tokens, (char *)"thickness", handle_thickness);
   insert(tokens, (char *)"paper", handle_paper);
   insert(tokens, (char *)"layers", handle_layers);
+
+  insert(tokens, (char *)"setup", handle_setup);
+  insert(tokens, (char *)"pad_to_mask_clearance", handle_pad_to_mask_clearance);
+  insert(tokens, (char *)"solder_mask_min_width", handle_solder_mask_min_width);
+  insert(tokens, (char *)"pad_to_paste_clearance", handle_pad_to_paste_clearance);
+  insert(tokens, (char *)"pad_to_paste_clearance_ratio", handle_pad_to_paste_clearance_ratio);
+  insert(tokens, (char *)"pcbplotparams", handle_pcbplotparams);
 }
 
 int open_pcb(const char *path){
@@ -130,7 +140,7 @@ static void parse_pcb(uint64_t start, uint64_t end){
   while(index <= end){
     if(BUFF[index] == '('){
       if(opens == 0){
-        printf("\n(", opens);
+        //printf("\n(");
         new_start = index;
       }
       opens++;
@@ -151,12 +161,12 @@ static void parse_pcb(uint64_t start, uint64_t end){
         }
         
         //printf("OPENS: %ld\n", opens);
-        printf("%s", token.chars);
+        //printf("%s", token.chars);
         free(token.chars);
         parse_pcb(new_start+1, new_end-1);
-        printf(")");
+        //printf(")");
         if(section_set){
-          printf("SECTION UNSET\n");
+          //printf("SECTION UNSET\n");
           *section_set = SECTION_CLOSED;
         }
       }
@@ -521,7 +531,6 @@ static int *handle_kicadpcb(uint64_t start, uint64_t end){
   pcb->kicad_pcb.section_start = start;
   pcb->kicad_pcb.section_end = end;
   set_section_index(start, end, &pcb->kicad_pcb);
-  pcb->header.index.section_start = parse_index;
   pcb->header.index.set = SECTION_SET;
   return &pcb->kicad_pcb.set;
 }
@@ -609,12 +618,13 @@ static int *handle_paper(uint64_t start, uint64_t end){
 
 static int *handle_layers(uint64_t start, uint64_t end){
   //printf("Start %ld End %ld\n", start, end);
-  if(pcb->page.index.set == SECTION_CLOSED){
+  if(pcb->page.index.set == SECTION_CLOSED && pcb->layers.index.set != SECTION_CLOSED){
     int opens = 0;
     uint64_t layer_start = 0, layer_end = 0;
     pcb->layers.index.set = SECTION_SET;
-    //printf("Handle Layers\n");
-    //printf("Start %c End %c\n", BUFF[start], BUFF[end]);
+    pcb->layers.index.section_start = start;
+    pcb->layers.index.section_end = end;
+    pcb->layers.layer = NULL;
     while(++start < end){
       if(BUFF[start] == '\"'){
         handle_quotes(&start, end, NULL);
@@ -636,6 +646,9 @@ static int *handle_layers(uint64_t start, uint64_t end){
         layer_start = 0;
         layer_end = 0;
       }
+    }
+    for (struct Layer *temp = pcb->layers.layer; temp; temp = temp->next){
+      printf("(\n\tLayer: %p,\n\tOrdianl: %d,\n\tCanonical_Name: \"%s\",\n\tType: %d,\n\tUser_Name: \"%s\",\n\tnext: %p,\n\tprev: %p\n)\n", temp, temp->ordinal, temp->canonical_name.chars, temp->type, temp->user_name.chars, temp->next, temp->prev);
     }
     return &pcb->layers.index.set;
   }
@@ -676,8 +689,163 @@ static int *handle_layer(uint64_t start, uint64_t end){
     s_ordinal[layer_index] = 0;
     type[type_index] = 0;
     ordinal = atoi(s_ordinal);
-    printf("(ORDINAL: %d; CONONICAL_NAME: \"%s\"; TYPE: %s; USER_NAME: \"%s\")\n", ordinal, cononical_name.chars, type, user_name.chars);
+    //printf("(ORDINAL: %d; CANONICAL_NAME: \"%s\"; TYPE: %s; USER_NAME: \"%s\")\n", ordinal, cononical_name.chars, type, user_name.chars);
+    struct Layer *layer = malloc(sizeof(struct Layer));
+    layer->ordinal = ordinal;
+    layer->canonical_name = cononical_name;
+    if(strcmp(type, (char *)"jumper") == 0){
+      layer->type = LAYER_TYPE_JUMPER;
+    }else if(strcmp(type, (char *)"mixed") == 0){
+      layer->type = LAYER_TYPE_MIXED;
+    }else if(strcmp(type, (char *)"power") == 0){
+      layer->type = LAYER_TYPE_POWER;
+    }else if(strcmp(type, (char *)"signal") == 0){
+      layer->type = LAYER_TYPE_SIGNAL;
+    }else{
+      layer->type = LAYER_TYPE_USER;
+    }
+    layer->user_name = user_name;
+    layer->next = NULL;
+    layer->prev = NULL;
+
+    if(pcb->layers.layer == NULL){
+      pcb->layers.layer = layer;
+    }else{
+      pcb->layers.layer->prev = layer;
+      layer->next = pcb->layers.layer;
+      pcb->layers.layer = layer;
+    }
   }
   // Allocate linked list node for each layer;
   return NULL;
 }
+
+static int *handle_setup(uint64_t start, uint64_t end){
+  if(pcb->layers.index.set == SECTION_CLOSED && pcb->setup.index.set != SECTION_CLOSED){
+    pcb->setup.index.section_start = start;
+    pcb->setup.index.section_end = end;
+    pcb->setup.index.set = SECTION_SET;
+    return &pcb->setup.index.set;
+  }
+  return NULL;
+}
+
+static int *handle_pad_to_mask_clearance(uint64_t start, uint64_t end){
+  if(pcb->setup.index.set == SECTION_SET){
+    String clearance;
+    float f_clearance;
+    handle_value_token(&start, end, &clearance);    
+    char *endptr;
+    f_clearance = strtof(clearance.chars, &endptr);
+    if(clearance.chars == endptr){
+      return NULL;
+    }
+    pcb->setup.pad_to_mask_clearance = f_clearance;
+    //printf("Found pad to mask clearance: %f\n", pcb->setup.pad_to_mask_clearance);
+    return NULL;
+  }
+  return NULL;
+}
+
+static int *handle_solder_mask_min_width(uint64_t start, uint64_t end){
+  if(pcb->setup.index.set == SECTION_SET){
+    String width;
+    float f_width;
+    handle_value_token(&start, end, &width);
+    char *endptr;
+    f_width = strtof(width.chars, &endptr);    
+    if(width.chars == endptr){
+      return NULL;
+    }
+    pcb->setup.solder_mask_min_width = f_width;
+    return NULL;
+  }
+  return NULL;
+}
+
+static int *handle_pad_to_paste_clearance(uint64_t start, uint64_t end){
+  if(pcb->setup.index.set == SECTION_SET){
+    String clearance;
+    float f_clearance;
+    handle_value_token(&start, end, &clearance);
+    char *endptr;
+    f_clearance = strtof(clearance.chars, &endptr);    
+    if(clearance.chars == endptr){
+      return NULL;
+    }
+    pcb->setup.pad_to_paste_clearance = f_clearance;
+    return NULL;
+  }
+  return NULL;
+}
+
+static int *handle_pad_to_paste_clearance_ratio(uint64_t start, uint64_t end){
+  if(pcb->setup.index.set == SECTION_SET){
+    String ratio;
+    float f_ratio;
+    handle_value_token(&start, end, &ratio);
+    char *endptr;
+    f_ratio = strtof(ratio.chars, &endptr);    
+    if(ratio.chars == endptr){
+      return NULL;
+    }
+    pcb->setup.pad_to_paste_clearance = f_ratio;
+    return NULL;
+  }
+  return NULL;
+}
+
+static int *handle_pcbplotparams(uint64_t start, uint64_t end){
+  if(pcb->setup.index.set == SECTION_SET){
+    pcb->setup.pcbplotparams.index.section_start = start;
+    pcb->setup.pcbplotparams.index.section_end = end;
+    pcb->setup.pcbplotparams.index.set = SECTION_SET;
+
+    return &pcb->setup.pcbplotparams.index.set;
+  }
+  return NULL;
+}
+
+/*
+(setup
+  (pad_to_mask_clearance 0) done
+  (allow_soldermask_bridges_in_footprints no)
+  (pcbplotparams
+    (layerselection 0x00010fc_ffffffff)
+    (plot_on_all_layers_selection 0x0000000_00000000)
+    (disableapertmacros no)
+    (usegerberextensions no)
+    (usegerberattributes yes)
+    (usegerberadvancedattributes yes)
+    (creategerberjobfile yes)
+    (dashed_line_dash_ratio 12.000000)
+    (dashed_line_gap_ratio 3.000000)
+    (svgprecision 4)
+    (plotframeref no)
+    (viasonmask no)
+    (mode 1)
+    (useauxorigin no)
+    (hpglpennumber 1)
+    (hpglpenspeed 20)
+    (hpglpendiameter 15.000000)
+    (pdf_front_fp_property_popups yes)
+    (pdf_back_fp_property_popups yes)
+    (dxfpolygonmode yes)
+    (dxfimperialunits yes)
+    (dxfusepcbnewfont yes)
+    (psnegative no)
+    (psa4output no)
+    (plotreference yes)
+    (plotvalue yes)
+    (plotfptext yes)
+    (plotinvisibletext no)
+    (sketchpadsonfab no)
+    (subtractmaskfromsilk no)
+    (outputformat 1)
+    (mirror no)
+    (drillshape 1)
+    (scaleselection 1)
+    (outputdirectory "")
+  )
+)
+*/

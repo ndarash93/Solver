@@ -17,6 +17,12 @@
 #define SECTION_UNSET 0
 #define SECTION_CLOSED 2
 
+#define LAYER_TYPE_JUMPER 1
+#define LAYER_TYPE_MIXED 2
+#define LAYER_TYPE_POWER 3
+#define LAYER_TYPE_SIGNAL 4
+#define LAYER_TYPE_USER 5
+
 struct Section_Index{
   int set;
   uint64_t section_start;
@@ -41,9 +47,9 @@ struct Page {
 };
 
 struct Layer {
-  int ordinal;
-  String name, user_name;
-  String type, material;
+  int ordinal, type;
+  String canonical_name, user_name;
+  String material;
   float thickness, permittivity, loss_tangent; 
   struct Layer *prev, *next;
 };
