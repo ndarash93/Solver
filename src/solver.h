@@ -5,10 +5,6 @@
 
 #include "utils.h"
 
-#define ERROR -1
-#define SUCCESS 1
-
-
 #define UNUSED 0
 #define OPEN 1
 #define CLOSED -1
@@ -54,6 +50,7 @@ struct Page {
 };
 
 struct Layer {
+  struct Section_Index index;
   int ordinal, type;
   String canonical_name, user_name;
   String material;
@@ -198,11 +195,6 @@ struct Images{
   struct Section_Index index;
 };
 
-struct Tracks{
-  struct Section_Index index;
-  struct Track *track;
-};
-
 struct Groups{
   struct Section_Index index;
 };
@@ -242,12 +234,8 @@ struct Track{
   struct Track *prev, *next;
 };
 
-struct Zones{
-  struct Section_Index index;
-  struct Zone *zone;
-};
-
 struct Zone {
+  struct Section_Index index;
   struct Net net;
   struct Layer layer;
   String uuid;
@@ -274,8 +262,8 @@ extern struct Board {
   struct Footprint *footprints;
   struct Graphic graphics;
   struct Images images;
-  struct Tracks *tracks;
-  struct Zones *zones;
+  struct Track *tracks;
+  struct Zone *zones;
   struct Groups groups;
 } *pcb;
 

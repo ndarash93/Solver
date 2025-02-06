@@ -12,12 +12,13 @@ int main(int argc, char **argv){
     return EXIT_FAILURE;
   }
   token_table_init();
+  printf("1\n");
   open_pcb(argv[1]);
   
   //print_pcb();
-  for (struct Net *temp = pcb->nets; temp; temp = temp->next){
-      printf("(\n\tNet: %p,\n\tOrdinal: %d,\n\tName: \"%s\",\n\tnext: %p,\n\tprev: %p\n)\n", temp, temp->ordinal, temp->name.chars, temp->next, temp->prev);
-    }
+  //for (struct Net *temp = pcb->nets; temp; temp = temp->next){
+  //    printf("(\n\tNet: %p,\n\tOrdinal: %d,\n\tName: \"%s\",\n\tnext: %p,\n\tprev: %p\n)\n", temp, temp->ordinal, temp->name.chars, temp->next, temp->prev);
+  //  }
   free_pcb();
 
   return EXIT_SUCCESS;

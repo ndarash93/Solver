@@ -53,6 +53,9 @@ static int *handle_pad_to_paste_clearance_ratio(uint64_t start, uint64_t end);
 static int *handle_pcbplotparams(uint64_t start, uint64_t end);
 
 static int *handle_net(uint64_t start, uint64_t end);
+static int *handle_footprint(uint64_t start, uint64_t end);
+static int *handle_zone(uint64_t start, uint64_t end);
+static int *handle_track(uint64_t start, uint64_t end);
 
 // Handler Helpers
 static int handle_quotes(uint64_t *start, uint64_t end, String *quote);
@@ -88,6 +91,7 @@ void token_table_init(){
   insert(tokens, (char *)"thickness", handle_thickness);
   insert(tokens, (char *)"paper", handle_paper);
   insert(tokens, (char *)"layers", handle_layers);
+  insert(tokens, (char *)"layer", handle_layer);
   insert(tokens, (char *)"setup", handle_setup);
   insert(tokens, (char *)"pad_to_mask_clearance", handle_pad_to_mask_clearance);
   insert(tokens, (char *)"solder_mask_min_width", handle_solder_mask_min_width);
@@ -95,6 +99,11 @@ void token_table_init(){
   insert(tokens, (char *)"pad_to_paste_clearance_ratio", handle_pad_to_paste_clearance_ratio);
   insert(tokens, (char *)"pcbplotparams", handle_pcbplotparams);
   insert(tokens, (char *)"net", handle_net);
+  insert(tokens, (char *)"footprint", handle_footprint);
+  insert(tokens, (char *)"zone", handle_zone);
+  insert(tokens, (char *)"via", handle_track);
+  insert(tokens, (char *)"segment", handle_track);
+  insert(tokens, (char *)"arc", handle_track);
 }
 
 int open_pcb(const char *path){
@@ -531,7 +540,7 @@ static void set_section_index(uint64_t start, uint64_t end, struct Section_Index
 
 // Handlers
 static int *handle_kicadpcb(uint64_t start, uint64_t end){
-  //printf("Handling PCB\n");
+  printf("Handling PCB\n");
   pcb->kicad_pcb.section_start = start;
   pcb->kicad_pcb.section_end = end;
   set_section_index(start, end, &pcb->kicad_pcb);
@@ -651,43 +660,39 @@ static int *handle_layers(uint64_t start, uint64_t end){
         layer_end = 0;
       }
     }
-    for (struct Layer *temp = pcb->layers.layer; temp; temp = temp->next){
-      printf("(\n\tLayer: %p,\n\tOrdianl: %d,\n\tCanonical_Name: \"%s\",\n\tType: %d,\n\tUser_Name: \"%s\",\n\tnext: %p,\n\tprev: %p\n)\n", temp, temp->ordinal, temp->canonical_name.chars, temp->type, temp->user_name.chars, temp->next, temp->prev);
-    }
+    //for (struct Layer *temp = pcb->layers.layer; temp; temp = temp->next){
+    //  printf("(\n\tLayer: %p,\n\tOrdianl: %d,\n\tCanonical_Name: \"%s\",\n\tType: %d,\n\tUser_Name: \"%s\",\n\tnext: %p,\n\tprev: %p\n)\n", temp, temp->ordinal, temp->canonical_name.chars, temp->type, temp->user_name.chars, temp->next, temp->prev);
+    //}
     return &pcb->layers.index.set;
   }
   return NULL;
 }
 
 static int *handle_layer(uint64_t start, uint64_t end){
-  //printf("Start %c End %c\n", BUFF[start], BUFF[end]);
-  //printf("Handle Layer\n");
+  printf("Handle Layer0\n");
+  uint64_t index = start;
   if(pcb->layers.index.set == SECTION_SET){
-     //printf("Handle Layer2\n");
+    printf("Handle Layer1\n");
     char s_ordinal[TOKEN_SZ], type[TOKEN_SZ];
     String cononical_name, user_name;
     cononical_name.chars = NULL, user_name.chars = NULL;
     int ordinal, layer_index = 0, type_index = 0;
-    //printf("Handle Layer3\n");
-    //printf("Start %ld End %ld\n", start, end);
-    if(BUFF[start] != '('){
+    if(BUFF[index] != '('){
       printf("Weird Error in handle_layer\n");
       return NULL;
     }
-    //printf("Handle Layer4\n");
-    while(++start < end){
-      if(BUFF[start] == '\"'){
-        handle_quotes(&start, end, (cononical_name.chars == NULL ? &cononical_name : &user_name)); // Handle error
+    while(++index < end){
+      if(BUFF[index] == '\"'){
+        handle_quotes(&index, end, (cononical_name.chars == NULL ? &cononical_name : &user_name)); // Handle error
       }
-      if(BUFF[start] == ')'){
-        //printf("End of layer");
+      if(BUFF[index] == ')'){
         break;
       }
-      if(cononical_name.chars == NULL && BUFF[start] != ' '){
-        s_ordinal[layer_index++] = BUFF[start];
+      if(cononical_name.chars == NULL && BUFF[index] != ' '){
+        s_ordinal[layer_index++] = BUFF[index];
       }
-      if(cononical_name.chars != NULL && user_name.chars == NULL && BUFF[start] != ' '){
-        type[type_index++] = BUFF[start];
+      if(cononical_name.chars != NULL && user_name.chars == NULL && BUFF[index] != ' '){
+        type[type_index++] = BUFF[index];
       }
     }
     s_ordinal[layer_index] = 0;
@@ -695,6 +700,9 @@ static int *handle_layer(uint64_t start, uint64_t end){
     ordinal = atoi(s_ordinal);
     //printf("(ORDINAL: %d; CANONICAL_NAME: \"%s\"; TYPE: %s; USER_NAME: \"%s\")\n", ordinal, cononical_name.chars, type, user_name.chars);
     struct Layer *layer = malloc(sizeof(struct Layer));
+    layer->index.section_start = start;
+    layer->index.section_end = end;
+    layer->index.set = SECTION_SET;
     layer->ordinal = ordinal;
     layer->canonical_name = cononical_name;
     if(strcmp(type, (char *)"jumper") == 0){
@@ -719,8 +727,24 @@ static int *handle_layer(uint64_t start, uint64_t end){
       layer->next = pcb->layers.layer;
       pcb->layers.layer = layer;
     }
+    printf("Handle Layer2\n");
+    return &layer->index.set;
+  }else if(pcb->footprints && pcb->footprints->index.set == SECTION_SET){
+    printf("Handle Layer3\n");
+    String name;
+    while(++index < end){
+      if(BUFF[index] == '\"'){
+        handle_quotes(&index, end, &name);
+      }
+    }
+    for(struct Layer *layer = pcb->layers.layer; layer; layer = layer->next){
+      if(string_compare(name, layer->canonical_name) == TRUE){
+        pcb->footprints->layer = layer;
+      }
+    }
+    printf("(ORDINAL: %d; CANONICAL_NAME: \"%s\"; TYPE: %d; USER_NAME: \"%s\")\n", pcb->footprints->layer->ordinal, pcb->footprints->layer->canonical_name.chars, pcb->footprints->layer->type, pcb->footprints->layer->user_name.chars);
   }
-  // Allocate linked list node for each layer;
+  printf("Handle Layer4\n");
   return NULL;
 }
 
@@ -811,22 +835,25 @@ static int *handle_pcbplotparams(uint64_t start, uint64_t end){
 }
 
 static int *handle_net(uint64_t start, uint64_t end){
-  if(pcb->footprints){
+  printf("Handle Net1\n");
+  if(pcb->footprints && pcb->footprints->index.set == SECTION_SET){
   
-  }else if(pcb->tracks){
+  }else if(pcb->tracks && pcb->tracks->index.set == SECTION_SET){
 
-  }else if (pcb->zones){
+  }else if (pcb->zones && pcb->zones->index.set == SECTION_SET){
 
   }else{
+    printf("Handle Net2\n");
     char s_ordinal[TOKEN_SZ];
     int ordinal_index = 0;
     String name;
-    while(start < end){
-      while(BUFF[start++] != ' ');
-      while(BUFF[start++] != ' '){
+    while(BUFF[++start] != ' ');
+    while(start++ < end){
+      if(BUFF[start] < '9' && BUFF[start] > '0'){
+        //printf("Ordinal: %c\n", BUFF[start]);
         COPY(s_ordinal, ordinal_index, start);
       }
-      if(BUFF[start] == '\"'){
+      else if(BUFF[start] == '\"'){
         handle_quotes(&start, end, &name);
       }
     }
@@ -848,16 +875,60 @@ static int *handle_net(uint64_t start, uint64_t end){
       net->next = pcb->nets;
       pcb->nets = net;
     }
+    printf("Handle Net3\n");
     return &net->index.set;
   }
+  printf("Handle Net4\n");
   return NULL;
 }
 
 static int *handle_footprint(uint64_t start, uint64_t end){
+  printf("Handle Foot1\n");
   struct Footprint *footprint = malloc(sizeof( struct Footprint));
-  pcb->setup.pcbplotparams.index.section_start = start;
-  pcb->setup.pcbplotparams.index.section_end = end;
-  pcb->setup.pcbplotparams.index.set = SECTION_SET;
-    // Maybe implement later i dont think we care
-  return &pcb->setup.pcbplotparams.index.set;
+  footprint->index.section_start = start;
+  footprint->index.section_end = end;
+  footprint->index.set = SECTION_SET;
+  if(pcb->footprints == NULL){
+    pcb->footprints = footprint;
+  }else{
+    pcb->footprints->prev = footprint;
+    footprint->next = pcb->footprints;
+    pcb->footprints = footprint;
+  }
+  printf("Handle Foot2\n");
+  return &pcb->footprints->index.set;
+}
+
+static int *handle_zone(uint64_t start, uint64_t end){
+  printf("Handle Zone1\n");
+  struct Zone *zone = malloc(sizeof(struct Zone));
+  zone->index.section_start = start;
+  zone->index.section_end = end;
+  zone->index.set = SECTION_SET;
+  if(pcb->zones == NULL){
+    pcb->zones = zone;
+  }else{
+    pcb->zones->prev = zone;
+    zone->next = pcb->zones;
+    pcb->zones = zone;
+  }
+  printf("Handle Zone2\n");
+  return &pcb->zones->index.set;
+}
+
+static int *handle_track(uint64_t start, uint64_t end){
+  printf("Handle Track1\n");
+  struct Track *track = malloc(sizeof(struct Track));
+  track->index.section_start = start;
+  track->index.section_end = end;
+  track->index.set = SECTION_SET;
+  if(pcb->tracks == NULL){
+    pcb->tracks = track;
+  }else{
+    pcb->tracks->prev = track;
+    track->next = pcb->tracks;
+    pcb->tracks = track;
+  }
+  printf("Handle Track2\n");
+  return &pcb->tracks->index.set;
 }
