@@ -669,10 +669,10 @@ static int *handle_layers(uint64_t start, uint64_t end){
 }
 
 static int *handle_layer(uint64_t start, uint64_t end){
-  printf("Handle Layer0\n");
+  //printf("Handle Layer0\n");
   uint64_t index = start;
   if(pcb->layers.index.set == SECTION_SET){
-    printf("Handle Layer1\n");
+    //printf("Handle Layer1\n");
     char s_ordinal[TOKEN_SZ], type[TOKEN_SZ];
     String cononical_name, user_name;
     cononical_name.chars = NULL, user_name.chars = NULL;
@@ -705,6 +705,8 @@ static int *handle_layer(uint64_t start, uint64_t end){
     layer->index.set = SECTION_SET;
     layer->ordinal = ordinal;
     layer->canonical_name = cononical_name;
+    layer->material.chars = NULL;
+    layer->material.length = 0;
     if(strcmp(type, (char *)"jumper") == 0){
       layer->type = LAYER_TYPE_JUMPER;
     }else if(strcmp(type, (char *)"mixed") == 0){
@@ -727,24 +729,27 @@ static int *handle_layer(uint64_t start, uint64_t end){
       layer->next = pcb->layers.layer;
       pcb->layers.layer = layer;
     }
-    printf("Handle Layer2\n");
+    //printf("Handle Layer2\n");
     return &layer->index.set;
   }else if(pcb->footprints && pcb->footprints->index.set == SECTION_SET){
-    printf("Handle Layer3\n");
+    //printf("Handle Layer3\n");
     String name;
     while(++index < end){
       if(BUFF[index] == '\"'){
         handle_quotes(&index, end, &name);
       }
     }
+    //printf("Handle Layer4\n");
     for(struct Layer *layer = pcb->layers.layer; layer; layer = layer->next){
+      //printf("Handle Layer5\n");
       if(string_compare(name, layer->canonical_name) == TRUE){
+        //printf("Handle Layer6 %s\n", layer->canonical_name.chars);
         pcb->footprints->layer = layer;
+        printf("(ORDINAL: %d; CANONICAL_NAME: \"%s\"; TYPE: %d; USER_NAME: \"%s\")\n", pcb->footprints->layer->ordinal, pcb->footprints->layer->canonical_name.chars, pcb->footprints->layer->type, pcb->footprints->layer->user_name.chars);
       }
     }
-    printf("(ORDINAL: %d; CANONICAL_NAME: \"%s\"; TYPE: %d; USER_NAME: \"%s\")\n", pcb->footprints->layer->ordinal, pcb->footprints->layer->canonical_name.chars, pcb->footprints->layer->type, pcb->footprints->layer->user_name.chars);
   }
-  printf("Handle Layer4\n");
+  //printf("Handle Layer4\n");
   return NULL;
 }
 
@@ -835,7 +840,7 @@ static int *handle_pcbplotparams(uint64_t start, uint64_t end){
 }
 
 static int *handle_net(uint64_t start, uint64_t end){
-  printf("Handle Net1\n");
+  //printf("Handle Net1\n");
   if(pcb->footprints && pcb->footprints->index.set == SECTION_SET){
   
   }else if(pcb->tracks && pcb->tracks->index.set == SECTION_SET){
@@ -843,7 +848,7 @@ static int *handle_net(uint64_t start, uint64_t end){
   }else if (pcb->zones && pcb->zones->index.set == SECTION_SET){
 
   }else{
-    printf("Handle Net2\n");
+    //printf("Handle Net2\n");
     char s_ordinal[TOKEN_SZ];
     int ordinal_index = 0;
     String name;
@@ -875,15 +880,15 @@ static int *handle_net(uint64_t start, uint64_t end){
       net->next = pcb->nets;
       pcb->nets = net;
     }
-    printf("Handle Net3\n");
+    //printf("Handle Net3\n");
     return &net->index.set;
   }
-  printf("Handle Net4\n");
+  //printf("Handle Net4\n");
   return NULL;
 }
 
 static int *handle_footprint(uint64_t start, uint64_t end){
-  printf("Handle Foot1\n");
+  //printf("Handle Foot1\n");
   struct Footprint *footprint = malloc(sizeof( struct Footprint));
   footprint->index.section_start = start;
   footprint->index.section_end = end;
@@ -895,12 +900,12 @@ static int *handle_footprint(uint64_t start, uint64_t end){
     footprint->next = pcb->footprints;
     pcb->footprints = footprint;
   }
-  printf("Handle Foot2\n");
+  //printf("Handle Foot2\n");
   return &pcb->footprints->index.set;
 }
 
 static int *handle_zone(uint64_t start, uint64_t end){
-  printf("Handle Zone1\n");
+  //printf("Handle Zone1\n");
   struct Zone *zone = malloc(sizeof(struct Zone));
   zone->index.section_start = start;
   zone->index.section_end = end;
@@ -912,12 +917,12 @@ static int *handle_zone(uint64_t start, uint64_t end){
     zone->next = pcb->zones;
     pcb->zones = zone;
   }
-  printf("Handle Zone2\n");
+  //printf("Handle Zone2\n");
   return &pcb->zones->index.set;
 }
 
 static int *handle_track(uint64_t start, uint64_t end){
-  printf("Handle Track1\n");
+  //printf("Handle Track1\n");
   struct Track *track = malloc(sizeof(struct Track));
   track->index.section_start = start;
   track->index.section_end = end;
@@ -929,6 +934,6 @@ static int *handle_track(uint64_t start, uint64_t end){
     track->next = pcb->tracks;
     pcb->tracks = track;
   }
-  printf("Handle Track2\n");
+  //printf("Handle Track2\n");
   return &pcb->tracks->index.set;
 }

@@ -1,7 +1,5 @@
 #include "solver.h"
 
-static void print_pcb();
-
 struct Board *pcb;
 
 int main(int argc, char **argv){
@@ -26,22 +24,37 @@ int main(int argc, char **argv){
 
 
 void free_pcb(){
-  struct Layer *temp_layer, *layer = pcb->layers.layer;
-  struct Net *temp_net, *net = pcb->nets;
   free(pcb->header.generator.chars);
   free(pcb->header.generator_version.chars);
   free(pcb->page.paper.chars);
-  /*while(layer){
-    temp = layer;
-    layer = layer->next;
+  for(struct Layer *temp = NULL, *layer = pcb->layers.layer; layer; temp = layer, layer = layer->next){
+    //printf("TEMP: %p, LAYER: %p, NEXT: %p\n", temp, layer, layer->next);
+    free(layer->canonical_name.chars);
+    free(layer->user_name.chars);
+    free(layer->material.chars);
     free(temp);
-  }*/
-  FREE(temp_layer, layer);
-  FREE(temp_net, net);
+  }
+  for(struct Net *temp = NULL, *net = pcb->nets; net; temp = net, net = net->next){
+    free(net->name.chars);
+    free(temp);
+  }
+  for(struct Footprint *temp = NULL, *footprint = pcb->footprints; footprint; temp = footprint, footprint = footprint->next){
+    free(footprint->attr.chars);
+    free(footprint->description.chars);
+    free(footprint->library_link.chars);
+    free(footprint->path.chars);
+    free(temp);
+  }
+  for(struct Track *temp = NULL, *track = pcb->tracks; track; temp = track, track = track->next){
+    if(track->type == TRACK_TYPE_ARC){
+      free(track->track.arc->uuid.chars);
+    }else if(track->type == TRACK_TYPE_SEG){
+      free(track->track.segment->uuid.chars);
+    }else if(track->type == TRACK_TYPE_VIA){
+      free(track->track.via->uuid.chars);
+    }
+    free(temp);
+  }
 
   free(pcb);
-}
-
-static void print_pcb(){
-  //printf();
 }

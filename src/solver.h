@@ -19,12 +19,17 @@
 #define LAYER_TYPE_SIGNAL 4
 #define LAYER_TYPE_USER 5
 
-#define FREE(temp, list) \
+#define TRACK_TYPE_SEG 1
+#define TRACK_TYPE_VIA 2
+#define TRACK_TYPE_ARC 3
+
+/*
 while(list){ \
   temp = list; \
   list = list->next; \
   free(temp);\
 }
+*/
 
 struct Section_Index{
   int set;
@@ -227,9 +232,9 @@ struct Track{
   struct Section_Index index;
   int type;
   union {
-    struct Segment segment;
-    struct Arc arc;
-    struct Via via;
+    struct Segment *segment;
+    struct Arc *arc;
+    struct Via *via;
   } track;
   struct Track *prev, *next;
 };
