@@ -23,13 +23,29 @@
 #define TRACK_TYPE_VIA 2
 #define TRACK_TYPE_ARC 3
 
-/*
-while(list){ \
-  temp = list; \
-  list = list->next; \
-  free(temp);\
-}
-*/
+#define ERROR -1
+#define SUCCESS 1
+
+#define TRUE 1
+#define FALSE 0
+
+#define THRU_HOLE 1
+#define SMD 2
+#define CONNECT 4
+#define NP_THRU_HOLE 8
+
+#define CIRCLE 1
+#define RECT 2
+#define OVAL 4
+#define TRAPEZOID 8
+#define ROUNDRECT 16
+#define CUSTOM 32
+
+typedef struct {
+    char *chars;
+    uint64_t length;
+} String;
+
 
 struct Section_Index{
   int set;
@@ -160,18 +176,6 @@ struct Line {
   struct Line *prev, *next;
 };
 
-#define THRU_HOLE 1
-#define SMD 2
-#define CONNECT 4
-#define NP_THRU_HOLE 8
-
-#define CIRCLE 1
-#define RECT 2
-#define OVAL 4
-#define TRAPEZOID 8
-#define ROUNDRECT 16
-#define CUSTOM 32
-
 struct Pad {
   String num;
   int type, shape, function;
@@ -278,3 +282,9 @@ void free_pcb();
 // Parser
 int open_pcb(const char *path);
 void token_table_init();
+
+// Utils
+int string_compare(String _1, String _2);
+
+// Debug
+void print_layer();

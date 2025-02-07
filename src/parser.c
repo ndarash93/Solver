@@ -51,11 +51,11 @@ static int *handle_solder_mask_min_width(uint64_t start, uint64_t end);
 static int *handle_pad_to_paste_clearance(uint64_t start, uint64_t end);
 static int *handle_pad_to_paste_clearance_ratio(uint64_t start, uint64_t end);
 static int *handle_pcbplotparams(uint64_t start, uint64_t end);
-
 static int *handle_net(uint64_t start, uint64_t end);
 static int *handle_footprint(uint64_t start, uint64_t end);
 static int *handle_zone(uint64_t start, uint64_t end);
 static int *handle_track(uint64_t start, uint64_t end);
+static int *handle_uuid(uint64_t start, uint64_t end);
 
 // Handler Helpers
 static int handle_quotes(uint64_t *start, uint64_t end, String *quote);
@@ -104,6 +104,7 @@ void token_table_init(){
   insert(tokens, (char *)"via", handle_track);
   insert(tokens, (char *)"segment", handle_track);
   insert(tokens, (char *)"arc", handle_track);
+  insert(tokens, (char *)"uuid", handle_uuid);
 }
 
 int open_pcb(const char *path){
@@ -660,19 +661,14 @@ static int *handle_layers(uint64_t start, uint64_t end){
         layer_end = 0;
       }
     }
-    //for (struct Layer *temp = pcb->layers.layer; temp; temp = temp->next){
-    //  printf("(\n\tLayer: %p,\n\tOrdianl: %d,\n\tCanonical_Name: \"%s\",\n\tType: %d,\n\tUser_Name: \"%s\",\n\tnext: %p,\n\tprev: %p\n)\n", temp, temp->ordinal, temp->canonical_name.chars, temp->type, temp->user_name.chars, temp->next, temp->prev);
-    //}
     return &pcb->layers.index.set;
   }
   return NULL;
 }
 
 static int *handle_layer(uint64_t start, uint64_t end){
-  //printf("Handle Layer0\n");
   uint64_t index = start;
   if(pcb->layers.index.set == SECTION_SET){
-    //printf("Handle Layer1\n");
     char s_ordinal[TOKEN_SZ], type[TOKEN_SZ];
     String cononical_name, user_name;
     cononical_name.chars = NULL, user_name.chars = NULL;
@@ -698,7 +694,6 @@ static int *handle_layer(uint64_t start, uint64_t end){
     s_ordinal[layer_index] = 0;
     type[type_index] = 0;
     ordinal = atoi(s_ordinal);
-    //printf("(ORDINAL: %d; CANONICAL_NAME: \"%s\"; TYPE: %s; USER_NAME: \"%s\")\n", ordinal, cononical_name.chars, type, user_name.chars);
     struct Layer *layer = malloc(sizeof(struct Layer));
     layer->index.section_start = start;
     layer->index.section_end = end;
@@ -729,23 +724,18 @@ static int *handle_layer(uint64_t start, uint64_t end){
       layer->next = pcb->layers.layer;
       pcb->layers.layer = layer;
     }
-    //printf("Handle Layer2\n");
     return &layer->index.set;
   }else if(pcb->footprints && pcb->footprints->index.set == SECTION_SET){
-    //printf("Handle Layer3\n");
     String name;
     while(++index < end){
       if(BUFF[index] == '\"'){
         handle_quotes(&index, end, &name);
       }
     }
-    //printf("Handle Layer4\n");
     for(struct Layer *layer = pcb->layers.layer; layer; layer = layer->next){
-      //printf("Handle Layer5\n");
       if(string_compare(name, layer->canonical_name) == TRUE){
-        //printf("Handle Layer6 %s\n", layer->canonical_name.chars);
         pcb->footprints->layer = layer;
-        printf("(ORDINAL: %d; CANONICAL_NAME: \"%s\"; TYPE: %d; USER_NAME: \"%s\")\n", pcb->footprints->layer->ordinal, pcb->footprints->layer->canonical_name.chars, pcb->footprints->layer->type, pcb->footprints->layer->user_name.chars);
+        //printf("(ORDINAL: %d; CANONICAL_NAME: \"%s\"; TYPE: %d; USER_NAME: \"%s\")\n", pcb->footprints->layer->ordinal, pcb->footprints->layer->canonical_name.chars, pcb->footprints->layer->type, pcb->footprints->layer->user_name.chars);
       }
     }
   }
@@ -893,6 +883,17 @@ static int *handle_footprint(uint64_t start, uint64_t end){
   footprint->index.section_start = start;
   footprint->index.section_end = end;
   footprint->index.set = SECTION_SET;
+
+  String library;
+  while(++start < end){
+    if(BUFF[start] == '\"'){
+      handle_quotes(&start, end, &library);
+      break;
+    }
+  }
+  footprint->library_link = library;
+  footprint->properties = NULL;
+
   if(pcb->footprints == NULL){
     pcb->footprints = footprint;
   }else{
@@ -936,4 +937,39 @@ static int *handle_track(uint64_t start, uint64_t end){
   }
   //printf("Handle Track2\n");
   return &pcb->tracks->index.set;
+}
+
+static int *handle_uuid(uint64_t start, uint64_t end){
+  if(pcb->footprints && pcb->footprints->index.set == SECTION_SET){
+    String uuid;
+    while(++start < end){
+      if(BUFF[start] == '\"'){
+        handle_quotes(&start, end, &uuid);
+      }
+    }
+    pcb->footprints->uuid = uuid;
+  }
+  return NULL;
+}
+
+static int *handle_at(uint64_t start, uint64_t end){
+  float x = 0.0, y = 0.0, angle = 0.0;
+  if(sscanf(&BUFF[start], "(at %f %f %f)", &x, &y, &angle) == 3){
+    printf("(at %f %f %f)\n", x, y, angle);
+  }else if(sscanf(&BUFF[start], "(at %f %f)", &x, &y) == 2){
+    printf("(at %f, %f)\n", x, y);
+  }else{
+    printf("Failed (at 0 0 0)");
+  }
+  struct at at;
+  at.x = x;
+  at.y = y;
+  at.angle = angle;
+
+  if(pcb->footprints && pcb->footprints->index.set == SECTION_SET && pcb->footprints->properties){
+    
+  }else if(pcb->footprints && pcb->footprints->index.set == SECTION_SET){
+    pcb->footprints->at = at;
+  }
+  return NULL;
 }
