@@ -57,6 +57,10 @@ void free_pcb(){
     }
     free(temp);
   }
+  for(struct Zone *temp = NULL, *zone = pcb->zones; zone; temp = zone, zone = zone->next){
+    free(zone->uuid.chars);
+    free(temp);
+  }
 
   free(pcb);
 }

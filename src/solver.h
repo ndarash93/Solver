@@ -6,9 +6,9 @@
 // Debug
 #include "debug.h"
 
-#define malloc(size) mem_track_malloc(size)
-#define calloc(num, size) mem_track_calloc(num, size)
-#define realloc(ptr, size) mem_track_realloc(ptr, size)
+#define malloc(size) mem_track_malloc(size, __LINE__, __func__, __FILE__)
+#define calloc(num, size) mem_track_calloc(num, size, __LINE__, __func__, __FILE__)
+#define realloc(ptr, size) mem_track_realloc(ptr, size, __LINE__, __func__, __FILE__)
 #define free(ptr) mem_track_free(ptr)
 
 #else

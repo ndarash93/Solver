@@ -123,7 +123,7 @@ int open_pcb(const char *path){
   fseek(file, 0, SEEK_END);
   length = ftell(file);
   fseek(file, 0, SEEK_SET);
-  buffer = malloc(length);
+  buffer = malloc(length * sizeof(char));
 
   if(buffer)
     bytes_read = fread(buffer, 1, length, file);
@@ -541,7 +541,7 @@ static void set_section_index(uint64_t start, uint64_t end, struct Section_Index
 
 // Handlers
 static int *handle_kicadpcb(uint64_t start, uint64_t end){
-  printf("Handling PCB\n");
+  //printf("Handling PCB\n");
   pcb->kicad_pcb.section_start = start;
   pcb->kicad_pcb.section_end = end;
   set_section_index(start, end, &pcb->kicad_pcb);
@@ -631,7 +631,7 @@ static int *handle_paper(uint64_t start, uint64_t end){
 }
 
 static int *handle_layers(uint64_t start, uint64_t end){
-  //printf("Start %ld End %ld\n", start, end);
+  //printf("Handle Layers\n");
   if(pcb->page.index.set == SECTION_CLOSED && pcb->layers.index.set != SECTION_CLOSED){
     int opens = 0;
     uint64_t layer_start = 0, layer_end = 0;
@@ -667,6 +667,7 @@ static int *handle_layers(uint64_t start, uint64_t end){
 }
 
 static int *handle_layer(uint64_t start, uint64_t end){
+  //printf("Handling Layer\n");
   uint64_t index = start;
   if(pcb->layers.index.set == SECTION_SET){
     char s_ordinal[TOKEN_SZ], type[TOKEN_SZ];
@@ -738,12 +739,14 @@ static int *handle_layer(uint64_t start, uint64_t end){
         //printf("(ORDINAL: %d; CANONICAL_NAME: \"%s\"; TYPE: %d; USER_NAME: \"%s\")\n", pcb->footprints->layer->ordinal, pcb->footprints->layer->canonical_name.chars, pcb->footprints->layer->type, pcb->footprints->layer->user_name.chars);
       }
     }
+    free(name.chars);
   }
   //printf("Handle Layer4\n");
   return NULL;
 }
 
 static int *handle_setup(uint64_t start, uint64_t end){
+  //printf("Handle setup\n");
   if(pcb->layers.index.set == SECTION_CLOSED && pcb->setup.index.set != SECTION_CLOSED){
     pcb->setup.index.section_start = start;
     pcb->setup.index.section_end = end;
@@ -754,6 +757,7 @@ static int *handle_setup(uint64_t start, uint64_t end){
 }
 
 static int *handle_pad_to_mask_clearance(uint64_t start, uint64_t end){
+  //printf("Hhandle_pad_to_mask_clearance\n");
   if(pcb->setup.index.set == SECTION_SET){
     String clearance;
     float f_clearance;
@@ -771,6 +775,7 @@ static int *handle_pad_to_mask_clearance(uint64_t start, uint64_t end){
 }
 
 static int *handle_solder_mask_min_width(uint64_t start, uint64_t end){
+  //printf("andle_solder_mask_min_width\n");
   if(pcb->setup.index.set == SECTION_SET){
     String width;
     float f_width;
@@ -787,6 +792,7 @@ static int *handle_solder_mask_min_width(uint64_t start, uint64_t end){
 }
 
 static int *handle_pad_to_paste_clearance(uint64_t start, uint64_t end){
+  //printf("handle_pad_to_paste_clearance\n");
   if(pcb->setup.index.set == SECTION_SET){
     String clearance;
     float f_clearance;
@@ -803,6 +809,7 @@ static int *handle_pad_to_paste_clearance(uint64_t start, uint64_t end){
 }
 
 static int *handle_pad_to_paste_clearance_ratio(uint64_t start, uint64_t end){
+  //printf("dle_pad_to_paste_clearance_ratio\n");
   if(pcb->setup.index.set == SECTION_SET){
     String ratio;
     float f_ratio;
@@ -819,6 +826,7 @@ static int *handle_pad_to_paste_clearance_ratio(uint64_t start, uint64_t end){
 }
 
 static int *handle_pcbplotparams(uint64_t start, uint64_t end){
+  //printf("handle_pcbplotparams\n");
   if(pcb->setup.index.set == SECTION_SET){
     pcb->setup.pcbplotparams.index.section_start = start;
     pcb->setup.pcbplotparams.index.section_end = end;
@@ -940,6 +948,7 @@ static int *handle_track(uint64_t start, uint64_t end){
 }
 
 static int *handle_uuid(uint64_t start, uint64_t end){
+  //printf("Handle_UUID\n");
   if(pcb->footprints && pcb->footprints->index.set == SECTION_SET){
     String uuid;
     while(++start < end){
@@ -953,6 +962,7 @@ static int *handle_uuid(uint64_t start, uint64_t end){
 }
 
 static int *handle_at(uint64_t start, uint64_t end){
+  //printf("Handle_at\n");
   float x = 0.0, y = 0.0, angle = 0.0;
   if(sscanf(&BUFF[start], "(at %f %f %f)", &x, &y, &angle) == 3){
     printf("(at %f %f %f)\n", x, y, angle);
