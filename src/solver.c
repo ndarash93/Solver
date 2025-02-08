@@ -4,7 +4,9 @@ struct Board *pcb;
 
 int main(int argc, char **argv){
   //pcb = malloc(sizeof(struct Board));
+  printf("Got Here\n");
   pcb = calloc(1, sizeof(struct Board));
+  printf("Got Here1\n");
   if (argc < 2){
     printf("No file specified\n");
     return EXIT_FAILURE;

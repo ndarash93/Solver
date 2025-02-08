@@ -1,9 +1,26 @@
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 
-#include "utils.h"
+
+#ifdef DEBUG 
+// Debug
+#include "debug.h"
+
+#define malloc(size) mem_track_malloc(size)
+#define calloc(num, size) mem_track_calloc(num, size)
+#define realloc(ptr, size) mem_track_realloc(ptr, size)
+#define free(ptr) mem_track_free(ptr)
+
+#else
+
+#include <stdlib.h>
+#include <stdio.h>
+
+#endif
+
+
+
+
 
 #define UNUSED 0
 #define OPEN 1
@@ -286,5 +303,3 @@ void token_table_init();
 // Utils
 int string_compare(String _1, String _2);
 
-// Debug
-void print_layer();

@@ -1,5 +1,5 @@
 #include "solver.h"
-#include <stdio.h>
+
 
 int string_compare(String _1, String _2){
   //printf("1: %s, 2: %s\n", _1.chars, _2.chars);

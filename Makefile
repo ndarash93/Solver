@@ -8,13 +8,13 @@ OBJ_FILES = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(SRC_FILES))
 
 ifeq ($(shell uname), Darwin) # macOS
   CC = clang
-  CFLAGS = -Wall -g -arch arm64 -v
+  CFLAGS = -Wall -g -arch arm64 -v -DDEBUG
   #LDLIBS = -L/usr/local/Cellar/glfw/3.3.1/lib -lglfw
   LDLIBS = -L/opt/homebrew/lib -lglfw
   LDFLAGS = -framework OpenGL -F /System/Library/Frameworks
   #LDFLAGS = -framework OpenGL
 else # Linux
-  CFLAGS = -Wall -g
+  CFLAGS = -Wall -g -DDEBUG
   CC = gcc
   LDLIBS = -lm -lGL -lglfw
 endif
