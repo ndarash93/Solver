@@ -728,6 +728,7 @@ static int *handle_layer(uint64_t start, uint64_t end){
     return &layer->index.set;
   }else if(pcb->footprints && pcb->footprints->index.set == SECTION_SET){
     String name;
+    name.chars = NULL;
     while(++index < end){
       if(BUFF[index] == '\"'){
         handle_quotes(&index, end, &name);
@@ -893,6 +894,7 @@ static int *handle_footprint(uint64_t start, uint64_t end){
   footprint->index.set = SECTION_SET;
 
   String library;
+  library.chars = NULL;
   while(++start < end){
     if(BUFF[start] == '\"'){
       handle_quotes(&start, end, &library);
@@ -901,6 +903,8 @@ static int *handle_footprint(uint64_t start, uint64_t end){
   }
   footprint->library_link = library;
   footprint->properties = NULL;
+  footprint->fp_lines = NULL;
+  footprint->pads = NULL;
 
   if(pcb->footprints == NULL){
     pcb->footprints = footprint;
@@ -949,8 +953,12 @@ static int *handle_track(uint64_t start, uint64_t end){
 
 static int *handle_uuid(uint64_t start, uint64_t end){
   //printf("Handle_UUID\n");
-  if(pcb->footprints && pcb->footprints->index.set == SECTION_SET){
+  if(pcb->footprints && pcb->footprints->index.set == SECTION_SET && pcb->footprints->properties && pcb->footprints->properties->index.set == SECTION_SET){
+
+  }
+  else if(pcb->footprints && pcb->footprints->index.set == SECTION_SET && pcb->footprints->properties && pcb->footprints->fp_lines && pcb->footprints->pads){ // Needs work
     String uuid;
+    uuid.chars = NULL;
     while(++start < end){
       if(BUFF[start] == '\"'){
         handle_quotes(&start, end, &uuid);

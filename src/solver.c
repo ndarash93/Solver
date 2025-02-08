@@ -45,6 +45,7 @@ void free_pcb(){
     free(footprint->description.chars);
     free(footprint->library_link.chars);
     free(footprint->path.chars);
+    free(footprint->uuid.chars);
     free(temp);
   }
   for(struct Track *temp = NULL, *track = pcb->tracks; track; temp = track, track = track->next){

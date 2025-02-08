@@ -157,6 +157,7 @@ struct Footprint {
   struct at at;
   // Properties properties; // I think text properties are needed to be treated different
   struct Footprint_Property{
+    struct Section_Index index;
     struct Property *property;
     struct at at;
     struct Layer *layer;
@@ -303,3 +304,6 @@ void token_table_init();
 // Utils
 int string_compare(String _1, String _2);
 
+// Printers
+void print_layer();
+void print_footprints();
