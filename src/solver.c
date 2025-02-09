@@ -19,6 +19,7 @@ int main(int argc, char **argv){
   //for (struct Net *temp = pcb->nets; temp; temp = temp->next){
   //    printf("(\n\tNet: %p,\n\tOrdinal: %d,\n\tName: \"%s\",\n\tnext: %p,\n\tprev: %p\n)\n", temp, temp->ordinal, temp->name.chars, temp->next, temp->prev);
   //  }
+  print_footprints(pcb->footprints);
   free_pcb();
 
   return EXIT_SUCCESS;
@@ -26,42 +27,71 @@ int main(int argc, char **argv){
 
 
 void free_pcb(){
+  a();
+  struct Layer *layer = pcb->layers.layer;
+  struct Net *net = pcb->nets;
+  struct Footprint *footprint = pcb->footprints;
+  struct Track *track = pcb->tracks;
+  struct Zone *zone = pcb->zones;
+  
+
+  free(pcb->header.version.chars);
   free(pcb->header.generator.chars);
   free(pcb->header.generator_version.chars);
   free(pcb->page.paper.chars);
-  for(struct Layer *temp = NULL, *layer = pcb->layers.layer; layer; temp = layer, layer = layer->next){
-    //printf("TEMP: %p, LAYER: %p, NEXT: %p\n", temp, layer, layer->next);
-    free(layer->canonical_name.chars);
-    free(layer->user_name.chars);
-    free(layer->material.chars);
+  while(layer){
+    struct Layer *temp = layer;
+    layer = layer->next;
+    free(temp->canonical_name.chars);
+    free(temp->user_name.chars);
+    free(temp->material.chars);
     free(temp);
   }
-  for(struct Net *temp = NULL, *net = pcb->nets; net; temp = net, net = net->next){
-    free(net->name.chars);
+  while(net){
+    struct Net *temp = net;
+    net = net->next;
+    free(temp->name.chars);
     free(temp);
   }
-  for(struct Footprint *temp = NULL, *footprint = pcb->footprints; footprint; temp = footprint, footprint = footprint->next){
-    free(footprint->attr.chars);
-    free(footprint->description.chars);
-    free(footprint->library_link.chars);
-    free(footprint->path.chars);
-    free(footprint->uuid.chars);
+  while(footprint){
+    struct Footprint *temp = footprint;
+    footprint = footprint->next;
+      if(temp->properties){
+        struct Footprint_Property *property = temp->properties;
+        while(property){
+          struct Footprint_Property *temp_property = property;
+          property = property->next;
+          free(temp_property->uuid.chars);
+          free(temp_property->property->key.chars);
+          free(temp_property->property->val.chars);
+          free(temp_property->property);
+          free(temp_property);
+        }
+      }
+    free(temp->attr.chars);
+    free(temp->description.chars);
+    free(temp->library_link.chars);
+    free(temp->path.chars);
+    free(temp->uuid.chars);
     free(temp);
   }
-  for(struct Track *temp = NULL, *track = pcb->tracks; track; temp = track, track = track->next){
-    if(track->type == TRACK_TYPE_ARC){
-      free(track->track.arc->uuid.chars);
-    }else if(track->type == TRACK_TYPE_SEG){
-      free(track->track.segment->uuid.chars);
-    }else if(track->type == TRACK_TYPE_VIA){
-      free(track->track.via->uuid.chars);
+  while(track){
+    struct Track *temp = track;
+    track = track->next;
+    if(temp->type == TRACK_TYPE_ARC){
+      free(temp->track.arc->uuid.chars);
+    }else if(temp->type == TRACK_TYPE_SEG){
+      free(temp->track.segment->uuid.chars);
+    }else if(temp->type == TRACK_TYPE_VIA){
+      free(temp->track.via->uuid.chars);
     }
     free(temp);
   }
-  for(struct Zone *temp = NULL, *zone = pcb->zones; zone; temp = zone, zone = zone->next){
-    free(zone->uuid.chars);
+  while(zone){
+    struct Zone *temp = zone;
+    zone = zone->next;
+    free(temp->uuid.chars);
     free(temp);
   }
-
   free(pcb);
 }

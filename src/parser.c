@@ -56,11 +56,14 @@ static int *handle_footprint(uint64_t start, uint64_t end);
 static int *handle_zone(uint64_t start, uint64_t end);
 static int *handle_track(uint64_t start, uint64_t end);
 static int *handle_uuid(uint64_t start, uint64_t end);
+static int *handle_property(uint64_t start, uint64_t end);
 
 // Handler Helpers
 static int handle_quotes(uint64_t *start, uint64_t end, String *quote);
 static void set_section_index(uint64_t start, uint64_t end, struct Section_Index *index);
 static void handle_value_token(uint64_t *start, uint64_t end, String *token);
+static struct Layer *find_layer(String name);
+static int *handle_descr(uint64_t start, uint64_t end);
 
 struct token{
   char *key;
@@ -105,6 +108,7 @@ void token_table_init(){
   insert(tokens, (char *)"segment", handle_track);
   insert(tokens, (char *)"arc", handle_track);
   insert(tokens, (char *)"uuid", handle_uuid);
+  insert(tokens, (char *)"property", handle_property);
 }
 
 int open_pcb(const char *path){
@@ -494,15 +498,26 @@ static void handle_value_token(uint64_t *start, uint64_t end, String *token){
   //printf("Handle Value Token (%ld)\n", *start);
   char val[TOKEN_SZ];
   int token_index = 0;
+  String quote;
+  quote.chars = NULL;
+  quote.length = 0;
   while(BUFF[(*start)++] != ' '); 
-  while(BUFF[(*start)] != ')')
-    val[token_index++] = BUFF[(*start)++];
-  val[token_index++] = '\0';
-  //(*start)--;
-  token->chars = malloc(token_index * sizeof(char));
-  strncpy(token->chars, val, token_index);
-  token->length = token_index;
+  if(BUFF[*start] == '\"'){
+    handle_quotes(start, end, &quote);
+    *token = quote;
+  }else{
+    while(BUFF[*start] != ')' && BUFF[*start] != '(' && BUFF[*start] != ' ' && BUFF[*start] > 32 && *start < end){
+      val[token_index++] = BUFF[(*start)++];
+      //(*start)++;
+    }
+    val[token_index++] = '\0';
+    token->chars = malloc(token_index * sizeof(char));
+    strncpy(token->chars, val, token_index);
+    token->length = token_index;
+  }
+  //printf("Printing Token: %s\n", token->chars);
 }
+
 
 static int handle_quotes(uint64_t *start, uint64_t end, String *quote){
   //printf("Handle Quotes\n");
@@ -539,6 +554,16 @@ static void set_section_index(uint64_t start, uint64_t end, struct Section_Index
   index->section_end = end;
 }
 
+static struct Layer *find_layer(String name){
+  for(struct Layer *layer = pcb->layers.layer; layer; layer = layer->next){
+    if(string_compare(name, layer->canonical_name) == TRUE){
+      return layer;
+      //printf("(ORDINAL: %d; CANONICAL_NAME: \"%s\"; TYPE: %d; USER_NAME: \"%s\")\n", pcb->footprints->layer->ordinal, pcb->footprints->layer->canonical_name.chars, pcb->footprints->layer->type, pcb->footprints->layer->user_name.chars);
+    }
+  }
+  return NULL;
+}
+
 // Handlers
 static int *handle_kicadpcb(uint64_t start, uint64_t end){
   //printf("Handling PCB\n");
@@ -553,6 +578,7 @@ static int *handle_kicadpcb(uint64_t start, uint64_t end){
 static int *handle_version(uint64_t start, uint64_t end){
   //printf("Handle Version (%ld)\n", start);
   String version;
+  version.chars = NULL;
   if(pcb->header.index.set == SECTION_SET){
     handle_value_token(&start, end, &version);
     pcb->header.version = version;
@@ -565,6 +591,7 @@ static int *handle_version(uint64_t start, uint64_t end){
 static int *handle_generator(uint64_t start, uint64_t end){
   //printf("Handle Generator\n");
   String generator;
+  generator.chars = NULL;
   if(pcb->header.index.set == SECTION_SET){
     handle_value_token(&start, end, &generator);
     pcb->header.generator = generator;
@@ -578,6 +605,7 @@ static int *handle_generator_version(uint64_t start, uint64_t end){
   //printf("Handle Generator Version\n");
   if(pcb->header.index.set == SECTION_SET){
     String generator_version;
+    generator_version.chars = NULL;
     handle_value_token(&start, end, &generator_version);
     pcb->header.generator_version = generator_version;
     //printf("Found generator version: %s\n", pcb->header.generator_version.chars);
@@ -603,6 +631,7 @@ static int *handle_thickness(uint64_t start, uint64_t end){
     handle_value_token(&start, end, &thickness);    
     char *endptr;
     pcb->general.thickness = strtof(thickness.chars, &endptr);
+    free(thickness.chars);
     if(thickness.chars == endptr){
       //printf("Float Error\n");
       return NULL;
@@ -734,12 +763,7 @@ static int *handle_layer(uint64_t start, uint64_t end){
         handle_quotes(&index, end, &name);
       }
     }
-    for(struct Layer *layer = pcb->layers.layer; layer; layer = layer->next){
-      if(string_compare(name, layer->canonical_name) == TRUE){
-        pcb->footprints->layer = layer;
-        //printf("(ORDINAL: %d; CANONICAL_NAME: \"%s\"; TYPE: %d; USER_NAME: \"%s\")\n", pcb->footprints->layer->ordinal, pcb->footprints->layer->canonical_name.chars, pcb->footprints->layer->type, pcb->footprints->layer->user_name.chars);
-      }
-    }
+    pcb->footprints->layer = find_layer(name);
     free(name.chars);
   }
   //printf("Handle Layer4\n");
@@ -765,6 +789,7 @@ static int *handle_pad_to_mask_clearance(uint64_t start, uint64_t end){
     handle_value_token(&start, end, &clearance);    
     char *endptr;
     f_clearance = strtof(clearance.chars, &endptr);
+    free(clearance.chars);
     if(clearance.chars == endptr){
       return NULL;
     }
@@ -901,10 +926,14 @@ static int *handle_footprint(uint64_t start, uint64_t end){
       break;
     }
   }
+
   footprint->library_link = library;
+  footprint->layer = NULL;
   footprint->properties = NULL;
   footprint->fp_lines = NULL;
   footprint->pads = NULL;
+
+  
 
   if(pcb->footprints == NULL){
     pcb->footprints = footprint;
@@ -915,6 +944,48 @@ static int *handle_footprint(uint64_t start, uint64_t end){
   }
   //printf("Handle Foot2\n");
   return &pcb->footprints->index.set;
+}
+
+static int *handle_property(uint64_t start, uint64_t end){
+  if(pcb->footprints && pcb->footprints->index.set == SECTION_SET){
+    struct Footprint_Property *footprint_property = malloc(sizeof(struct Footprint_Property));
+    struct Property *property = malloc(sizeof(struct Property));
+    String key, val;
+    key.chars = NULL;
+    val.chars = NULL;
+    key.length = 0, val.length = 0;
+    footprint_property->index.set = SECTION_SET;
+    footprint_property->index.section_start = start;
+    footprint_property->index.section_end = end;
+
+    handle_value_token(&start, end, &key);
+    handle_value_token(&start, end, &val);
+    property->key = key;
+    property->val = val;
+    property->next = NULL;
+
+    printf("Key: %s\n", key.chars);
+    printf("Value: %s\n", val.chars);
+
+    footprint_property->property = property;
+
+    if(pcb->footprints && pcb->footprints->properties == NULL){
+      pcb->footprints->properties = footprint_property;
+    }else if(pcb->footprints->properties){
+      pcb->footprints->properties->prev = footprint_property;
+      footprint_property->next = pcb->footprints->properties;
+      pcb->footprints->properties = footprint_property;
+    }else{
+      printf("IDK\n");
+      free(footprint_property);
+      free(property);
+      free(key.chars);
+      free(val.chars);
+    }
+
+    return &footprint_property->index.set;
+  }
+  return NULL;
 }
 
 static int *handle_zone(uint64_t start, uint64_t end){
@@ -953,10 +1024,7 @@ static int *handle_track(uint64_t start, uint64_t end){
 
 static int *handle_uuid(uint64_t start, uint64_t end){
   //printf("Handle_UUID\n");
-  if(pcb->footprints && pcb->footprints->index.set == SECTION_SET && pcb->footprints->properties && pcb->footprints->properties->index.set == SECTION_SET){
-
-  }
-  else if(pcb->footprints && pcb->footprints->index.set == SECTION_SET && pcb->footprints->properties && pcb->footprints->fp_lines && pcb->footprints->pads){ // Needs work
+  if(pcb->footprints && pcb->footprints->index.set == SECTION_SET && pcb->footprints->uuid.chars != NULL){
     String uuid;
     uuid.chars = NULL;
     while(++start < end){
@@ -965,6 +1033,9 @@ static int *handle_uuid(uint64_t start, uint64_t end){
       }
     }
     pcb->footprints->uuid = uuid;
+  }
+  else if(pcb->footprints && pcb->footprints->index.set == SECTION_SET){ // Needs work
+    
   }
   return NULL;
 }
@@ -988,6 +1059,15 @@ static int *handle_at(uint64_t start, uint64_t end){
     
   }else if(pcb->footprints && pcb->footprints->index.set == SECTION_SET){
     pcb->footprints->at = at;
+  }
+  return NULL;
+}
+
+static int *handle_descr(uint64_t start, uint64_t end){
+  if(pcb->footprints && pcb->footprints->index.set == SECTION_SET){
+    String description;
+    handle_value_token(&start, end, &description);
+    pcb->footprints->description = description;
   }
   return NULL;
 }

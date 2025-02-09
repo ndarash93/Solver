@@ -11,3 +11,5 @@ void *mem_track_realloc(void *ptr, size_t size, const int line, const char *func
 void mem_track_free(void *ptr);
 void mem_check_leaks();
 void cleanup();
+
+void debug_helper(const int line, const char *func, const char *file);

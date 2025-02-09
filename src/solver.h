@@ -11,7 +11,11 @@
 #define realloc(ptr, size) mem_track_realloc(ptr, size, __LINE__, __func__, __FILE__)
 #define free(ptr) mem_track_free(ptr)
 
+#define a() debug_helper(__LINE__, __func__, __FILE__)
+
 #else
+
+#define a() //
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -108,10 +112,7 @@ struct Stackup{
 
 struct Property{
   String key;
-  union {
-    String sval;
-    float fval;
-  } val;
+  String val;
   struct Property *next, *prev;
 };
 
@@ -162,7 +163,7 @@ struct Footprint {
     struct at at;
     struct Layer *layer;
     String uuid; 
-    struct Footprint_Property *next;
+    struct Footprint_Property *next, *prev;
   } *properties;
   String path, sheetname, sheetfile, attr;
   struct Line *fp_lines;
@@ -263,8 +264,8 @@ struct Track{
 
 struct Zone {
   struct Section_Index index;
-  struct Net net;
-  struct Layer layer;
+  struct Net *net;
+  struct Layer *layer;
   String uuid;
   uint32_t priority;
   struct Point *points;
@@ -306,4 +307,6 @@ int string_compare(String _1, String _2);
 
 // Printers
 void print_layer();
-void print_footprints();
+void print_footprints(struct Footprint *footprint);
+void print_properties(struct Property *property);
+void print_footprint_properties(struct Footprint_Property *property);

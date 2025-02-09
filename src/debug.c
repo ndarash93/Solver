@@ -68,6 +68,8 @@ void mem_untrack(void *ptr){
       free(curr->next);
       curr->next = temp;
       return;
+    }else if (!ptr){
+      return;
     }
   }
   fprintf(stderr, "Trying to untrack a non-tracked pointer\n");
@@ -77,7 +79,7 @@ void *mem_track_malloc(size_t size, const int line, const char *function, const 
   void *ptr = malloc(size);
   if(ptr){
     mem_track(ptr, size, line, function, file);
-    printf("Mallocated %zu bytes at %p\n", size, ptr);
+    //printf("Mallocated %zu bytes at %p\n", size, ptr);
   }
   return ptr;
 }
@@ -87,7 +89,7 @@ void *mem_track_calloc(size_t num, size_t size, const int line, const char *func
   void *ptr = calloc(num, size);
   if(ptr){
     mem_track(ptr, num*size, line, function, file);
-    printf("Callocated %zu bytes at %p\n", num*size, ptr);
+    //printf("Callocated %zu bytes at %p\n", num*size, ptr);
   }
   return ptr;
 }
@@ -99,14 +101,14 @@ void *mem_track_realloc(void *ptr, size_t size, const int line, const char *func
   void *new_ptr = realloc(ptr, size);
   if(new_ptr){
     mem_track(new_ptr, size, line, function, file);
-    printf("Reallocated %zu bytes at %p\n", size, new_ptr);
+    //printf("Reallocated %zu bytes at %p\n", size, new_ptr);
   }
   return new_ptr;
 }
 
 void mem_track_free(void *ptr){
   mem_untrack(ptr);
-  printf("Untracked memory at %p\n", ptr);
+  //printf("Untracked memory at %p\n", ptr);
   free(ptr);
 }
 
@@ -120,4 +122,8 @@ void mem_check_leaks(){
 
 __attribute__((destructor)) void cleanup(){
   mem_check_leaks();
+}
+
+void debug_helper(const int line, const char *func, const char *file){
+  printf("Got to %d in %s in %s\n", line, func, file);
 }
