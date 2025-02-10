@@ -1,7 +1,7 @@
 #include "solver.h"
 
 #define HASH_CAP 5000
-#define TOKEN_SZ 250
+#define TOKEN_SZ 300
 
 #define BUFF pcb->file_buffer.buffer.chars
 #define INDEX pcb->file_buffer.index
@@ -57,13 +57,14 @@ static int *handle_zone(uint64_t start, uint64_t end);
 static int *handle_track(uint64_t start, uint64_t end);
 static int *handle_uuid(uint64_t start, uint64_t end);
 static int *handle_property(uint64_t start, uint64_t end);
+static int *handle_descr(uint64_t start, uint64_t end);
+static int *handle_at(uint64_t start, uint64_t end);
 
 // Handler Helpers
 static int handle_quotes(uint64_t *start, uint64_t end, String *quote);
 static void set_section_index(uint64_t start, uint64_t end, struct Section_Index *index);
 static void handle_value_token(uint64_t *start, uint64_t end, String *token);
 static struct Layer *find_layer(String name);
-static int *handle_descr(uint64_t start, uint64_t end);
 
 struct token{
   char *key;
@@ -109,6 +110,8 @@ void token_table_init(){
   insert(tokens, (char *)"arc", handle_track);
   insert(tokens, (char *)"uuid", handle_uuid);
   insert(tokens, (char *)"property", handle_property);
+  insert(tokens, (char *)"descr", handle_descr);
+  insert(tokens, (char *)"at", handle_at);
 }
 
 int open_pcb(const char *path){
@@ -560,6 +563,7 @@ static struct Layer *find_layer(String name){
       return layer;
       //printf("(ORDINAL: %d; CANONICAL_NAME: \"%s\"; TYPE: %d; USER_NAME: \"%s\")\n", pcb->footprints->layer->ordinal, pcb->footprints->layer->canonical_name.chars, pcb->footprints->layer->type, pcb->footprints->layer->user_name.chars);
     }
+    //printf("%s = %s\n", name.chars, layer->canonical_name.chars);
   }
   return NULL;
 }
@@ -755,18 +759,20 @@ static int *handle_layer(uint64_t start, uint64_t end){
       pcb->layers.layer = layer;
     }
     return &layer->index.set;
+  }else if(pcb->footprints && pcb->footprints->index.set == SECTION_SET && pcb->footprints->properties && pcb->footprints->properties->index.set == SECTION_SET){
+    String name;
+    name.chars = NULL;
+    name.length = 0;
+    handle_value_token(&start, end, &name);
+    pcb->footprints->properties->layer = find_layer(name);
+    free(name.chars);
   }else if(pcb->footprints && pcb->footprints->index.set == SECTION_SET){
     String name;
     name.chars = NULL;
-    while(++index < end){
-      if(BUFF[index] == '\"'){
-        handle_quotes(&index, end, &name);
-      }
-    }
+    handle_value_token(&start, end, &name);
     pcb->footprints->layer = find_layer(name);
     free(name.chars);
   }
-  //printf("Handle Layer4\n");
   return NULL;
 }
 
@@ -920,12 +926,7 @@ static int *handle_footprint(uint64_t start, uint64_t end){
 
   String library;
   library.chars = NULL;
-  while(++start < end){
-    if(BUFF[start] == '\"'){
-      handle_quotes(&start, end, &library);
-      break;
-    }
-  }
+  handle_value_token(&start, end, &library);
 
   footprint->library_link = library;
   footprint->layer = NULL;
@@ -964,8 +965,8 @@ static int *handle_property(uint64_t start, uint64_t end){
     property->val = val;
     property->next = NULL;
 
-    printf("Key: %s\n", key.chars);
-    printf("Value: %s\n", val.chars);
+    //printf("Key: %s\n", key.chars);
+    //printf("Value: %s\n", val.chars);
 
     footprint_property->property = property;
 
@@ -1024,18 +1025,19 @@ static int *handle_track(uint64_t start, uint64_t end){
 
 static int *handle_uuid(uint64_t start, uint64_t end){
   //printf("Handle_UUID\n");
-  if(pcb->footprints && pcb->footprints->index.set == SECTION_SET && pcb->footprints->uuid.chars != NULL){
+  if(pcb->footprints && pcb->footprints->index.set == SECTION_SET && pcb->footprints->uuid.chars == NULL){
     String uuid;
     uuid.chars = NULL;
-    while(++start < end){
-      if(BUFF[start] == '\"'){
-        handle_quotes(&start, end, &uuid);
-      }
-    }
+    handle_value_token(&start, end, &uuid);
+    //printf("UUID: %s", uuid.chars);
     pcb->footprints->uuid = uuid;
   }
-  else if(pcb->footprints && pcb->footprints->index.set == SECTION_SET){ // Needs work
-    
+  else if(pcb->footprints && pcb->footprints->index.set == SECTION_SET && pcb->footprints->properties && pcb->footprints->properties->index.set == SECTION_SET){ // Needs work
+    String uuid;
+    uuid.chars = NULL;
+    uuid.length = 0;
+    handle_value_token(&start, end, &uuid);
+    pcb->footprints->properties->uuid = uuid;
   }
   return NULL;
 }
@@ -1064,9 +1066,12 @@ static int *handle_at(uint64_t start, uint64_t end){
 }
 
 static int *handle_descr(uint64_t start, uint64_t end){
+  printf("Handle description\n");
   if(pcb->footprints && pcb->footprints->index.set == SECTION_SET){
     String description;
+    printf("Handle description1\n");
     handle_value_token(&start, end, &description);
+    printf("Handle description2\n");
     pcb->footprints->description = description;
   }
   return NULL;
