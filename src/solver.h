@@ -185,6 +185,7 @@ struct Size{
 };
 
 struct Line {
+  struct Section_Index index;
   struct Point start, end;
   struct Layer *layer;
   struct Stroke {

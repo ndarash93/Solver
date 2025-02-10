@@ -59,6 +59,7 @@ static int *handle_uuid(uint64_t start, uint64_t end);
 static int *handle_property(uint64_t start, uint64_t end);
 static int *handle_descr(uint64_t start, uint64_t end);
 static int *handle_at(uint64_t start, uint64_t end);
+static int *handle_fp_line(uint64_t start, uint64_t end);
 
 // Handler Helpers
 static int handle_quotes(uint64_t *start, uint64_t end, String *quote);
@@ -112,6 +113,7 @@ void token_table_init(){
   insert(tokens, (char *)"property", handle_property);
   insert(tokens, (char *)"descr", handle_descr);
   insert(tokens, (char *)"at", handle_at);
+  insert(tokens, (char *)"fp_line", handle_fp_line);
 }
 
 int open_pcb(const char *path){
@@ -1046,9 +1048,9 @@ static int *handle_at(uint64_t start, uint64_t end){
   //printf("Handle_at\n");
   float x = 0.0, y = 0.0, angle = 0.0;
   if(sscanf(&BUFF[start], "(at %f %f %f)", &x, &y, &angle) == 3){
-    printf("(at %f %f %f)\n", x, y, angle);
+    //printf("(at %f %f %f)\n", x, y, angle);
   }else if(sscanf(&BUFF[start], "(at %f %f)", &x, &y) == 2){
-    printf("(at %f, %f)\n", x, y);
+    //printf("(at %f, %f)\n", x, y);
   }else{
     printf("Failed (at 0 0 0)");
   }
@@ -1058,7 +1060,7 @@ static int *handle_at(uint64_t start, uint64_t end){
   at.angle = angle;
 
   if(pcb->footprints && pcb->footprints->index.set == SECTION_SET && pcb->footprints->properties){
-    
+    pcb->footprints->properties->at = at;
   }else if(pcb->footprints && pcb->footprints->index.set == SECTION_SET){
     pcb->footprints->at = at;
   }
@@ -1066,13 +1068,33 @@ static int *handle_at(uint64_t start, uint64_t end){
 }
 
 static int *handle_descr(uint64_t start, uint64_t end){
-  printf("Handle description\n");
+  //printf("Handle description\n");
   if(pcb->footprints && pcb->footprints->index.set == SECTION_SET){
     String description;
-    printf("Handle description1\n");
+    //printf("Handle description1\n");
     handle_value_token(&start, end, &description);
-    printf("Handle description2\n");
+    //printf("Handle description2\n");
     pcb->footprints->description = description;
+  }
+  return NULL;
+}
+
+static int *handle_fp_line(uint64_t start, uint64_t end){
+  printf("FP_LIME\n");
+  if(pcb->footprints && pcb->footprints->index.set == SECTION_SET){
+    struct Line *line = malloc(sizeof(struct Line));
+    line->index.section_start = start;
+    line->index.section_end = end;
+    line->index.set = SECTION_SET;
+    line->next = NULL;
+    if(pcb->footprints->fp_lines == NULL){
+      pcb->footprints->fp_lines = line;
+    }else{
+      pcb->footprints->fp_lines->prev = line;
+      line->next = pcb->footprints->fp_lines;
+      pcb->footprints->fp_lines = line;
+    }
+    return &line->index.set;
   }
   return NULL;
 }

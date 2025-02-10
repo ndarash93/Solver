@@ -58,14 +58,25 @@ void free_pcb(){
     footprint = footprint->next;
       if(temp->properties){
         struct Footprint_Property *property = temp->properties;
-        while(property){
-          struct Footprint_Property *temp_property = property;
+        struct Footprint_Property *temp_property;
+        while(property){ 
+          temp_property = property;
           property = property->next;
           free(temp_property->uuid.chars);
           free(temp_property->property->key.chars);
           free(temp_property->property->val.chars);
           free(temp_property->property);
           free(temp_property);
+        }
+      }
+      if(temp->fp_lines){
+        struct Line  *line = temp->fp_lines;
+        struct Line  *temp_line;
+        while(line){
+          temp_line = line;
+          line = line->next;
+          free(temp_line->uuid.chars);
+          free(temp_line);
         }
       }
     free(temp->attr.chars);
