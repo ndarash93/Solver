@@ -79,6 +79,18 @@ void free_pcb(){
           free(temp_line);
         }
       }
+      if(temp->pads){
+        struct Pad *pad = temp->pads;
+        struct Pad * temp_pad;
+        while(pad){
+          temp_pad = pad;
+          pad = pad->next;
+          free(temp_pad->num.chars);
+          free(temp_pad->uuid.chars);
+          free(temp_pad->layers);
+          free(temp_pad);
+        }
+      }
     free(temp->attr.chars);
     free(temp->description.chars);
     free(temp->library_link.chars);

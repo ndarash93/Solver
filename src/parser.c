@@ -60,12 +60,17 @@ static int *handle_property(uint64_t start, uint64_t end);
 static int *handle_descr(uint64_t start, uint64_t end);
 static int *handle_at(uint64_t start, uint64_t end);
 static int *handle_fp_line(uint64_t start, uint64_t end);
+static int *handle_start(uint64_t start, uint64_t end);
+static int *handle_end(uint64_t start, uint64_t end);
+static int *handle_pad(uint64_t start, uint64_t end);
+static int *handle_size(uint64_t start, uint64_t end);
 
 // Handler Helpers
 static int handle_quotes(uint64_t *start, uint64_t end, String *quote);
 static void set_section_index(uint64_t start, uint64_t end, struct Section_Index *index);
 static void handle_value_token(uint64_t *start, uint64_t end, String *token);
 static struct Layer *find_layer(String name);
+static struct Net *find_net(int ordinal);
 
 struct token{
   char *key;
@@ -114,6 +119,10 @@ void token_table_init(){
   insert(tokens, (char *)"descr", handle_descr);
   insert(tokens, (char *)"at", handle_at);
   insert(tokens, (char *)"fp_line", handle_fp_line);
+  insert(tokens, (char *)"start", handle_start);
+  insert(tokens, (char *)"end", handle_end);
+  insert(tokens, (char *)"pad", handle_pad);
+  insert(tokens, (char *)"size", handle_size);
 }
 
 int open_pcb(const char *path){
@@ -570,6 +579,15 @@ static struct Layer *find_layer(String name){
   return NULL;
 }
 
+static struct Net *find_net(int ordinal){
+  for(struct Net *net = pcb->nets; net; net = net->next){
+    if(ordinal == net->ordinal){
+      return net;
+    }
+  }
+  return NULL;
+}
+
 // Handlers
 static int *handle_kicadpcb(uint64_t start, uint64_t end){
   //printf("Handling PCB\n");
@@ -697,6 +715,25 @@ static int *handle_layers(uint64_t start, uint64_t end){
       }
     }
     return &pcb->layers.index.set;
+  }else if(pcb->footprints && pcb->footprints->index.set == SECTION_SET && pcb->footprints->pads && pcb->footprints->pads->index.set == SECTION_SET){
+    int layer_count = 0, index = start;
+    while(++index < end){
+      //handle_value_token(&start, end, )
+      if(BUFF[index] == ' '){
+        layer_count++;
+      }
+    }
+    printf("LAYER COUNT: %d\n", layer_count);
+    struct Layer **layer = calloc(layer_count, sizeof(struct Layer *));
+    String layer_name;
+    for(int i = 0; i < layer_count; i++){
+      handle_value_token(&start, end, &layer_name);
+      layer[i] = find_layer(layer_name);
+      free(layer_name.chars);
+      printf("Layer[%d] \"%s\"\n", i, layer[i]->canonical_name.chars);
+    }
+    pcb->footprints->pads->layer_count = layer_count;
+    pcb->footprints->pads->layers = layer;
   }
   return NULL;
 }
@@ -768,11 +805,17 @@ static int *handle_layer(uint64_t start, uint64_t end){
     handle_value_token(&start, end, &name);
     pcb->footprints->properties->layer = find_layer(name);
     free(name.chars);
-  }else if(pcb->footprints && pcb->footprints->index.set == SECTION_SET){
+  }else if(pcb->footprints && pcb->footprints->index.set == SECTION_SET && pcb->footprints->layer == NULL){
     String name;
     name.chars = NULL;
     handle_value_token(&start, end, &name);
     pcb->footprints->layer = find_layer(name);
+    free(name.chars);
+  }else if(pcb->footprints && pcb->footprints->index.set == SECTION_SET && pcb->footprints->fp_lines && pcb->footprints->fp_lines->index.set == SECTION_SET && pcb->footprints->fp_lines->layer == NULL){
+    String name;
+    name.chars = NULL;
+    handle_value_token(&start, end, &name);
+    pcb->footprints->fp_lines->layer = find_layer(name);
     free(name.chars);
   }
   return NULL;
@@ -873,8 +916,15 @@ static int *handle_pcbplotparams(uint64_t start, uint64_t end){
 
 static int *handle_net(uint64_t start, uint64_t end){
   //printf("Handle Net1\n");
-  if(pcb->footprints && pcb->footprints->index.set == SECTION_SET){
-  
+  if(pcb->footprints && pcb->footprints->index.set == SECTION_SET && pcb->footprints->pads && pcb->footprints->pads->index.set == SECTION_SET){
+    String ordinal_S;
+    int ordinal = -1;
+    struct Net *net = NULL;
+    handle_value_token(&start, end, &ordinal_S);
+    ordinal = atoi(ordinal_S.chars);
+    free(ordinal_S.chars);
+    net = find_net(ordinal);
+    pcb->footprints->pads->net = net;
   }else if(pcb->tracks && pcb->tracks->index.set == SECTION_SET){
 
   }else if (pcb->zones && pcb->zones->index.set == SECTION_SET){
@@ -1041,6 +1091,13 @@ static int *handle_uuid(uint64_t start, uint64_t end){
     handle_value_token(&start, end, &uuid);
     pcb->footprints->properties->uuid = uuid;
   }
+  else if(pcb->footprints && pcb->footprints->index.set == SECTION_SET && pcb->footprints->fp_lines && pcb->footprints->fp_lines->index.set == SECTION_SET){ // Needs work
+    String uuid;
+    uuid.chars = NULL;
+    uuid.length = 0;
+    handle_value_token(&start, end, &uuid);
+    pcb->footprints->fp_lines->uuid = uuid;
+  }
   return NULL;
 }
 
@@ -1059,8 +1116,10 @@ static int *handle_at(uint64_t start, uint64_t end){
   at.y = y;
   at.angle = angle;
 
-  if(pcb->footprints && pcb->footprints->index.set == SECTION_SET && pcb->footprints->properties){
+  if(pcb->footprints && pcb->footprints->index.set == SECTION_SET && pcb->footprints->properties && pcb->footprints->properties->index.set == SECTION_SET){
     pcb->footprints->properties->at = at;
+  }else if(pcb->footprints && pcb->footprints->index.set == SECTION_SET && pcb->footprints->pads && pcb->footprints->pads->index.set == SECTION_SET){
+    pcb->footprints->pads->at = at;
   }else if(pcb->footprints && pcb->footprints->index.set == SECTION_SET){
     pcb->footprints->at = at;
   }
@@ -1098,3 +1157,109 @@ static int *handle_fp_line(uint64_t start, uint64_t end){
   }
   return NULL;
 }
+
+static int *handle_start(uint64_t start, uint64_t end){
+  if(pcb->footprints->fp_lines && pcb->footprints->fp_lines->index.set == SECTION_SET){
+    struct Point point;
+    if(sscanf(&BUFF[start], "(start %f %f)", &point.x, &point.y) == 2){
+
+    }else{
+      fprintf(stderr, "Weird error");
+    }
+    pcb->footprints->fp_lines->start = point;
+  }
+  return NULL;
+}
+
+static int *handle_end(uint64_t start, uint64_t end){
+  if(pcb->footprints->fp_lines && pcb->footprints->fp_lines->index.set == SECTION_SET){
+    struct Point point;
+    if(sscanf(&BUFF[start], "(end %f %f)", &point.x, &point.y) == 2){
+
+    }else{
+      fprintf(stderr, "Weird error");
+    }
+    pcb->footprints->fp_lines->end = point;
+  }
+  return NULL;
+}
+
+static int *handle_pad(uint64_t start, uint64_t end){
+  if(pcb->footprints && pcb->footprints->index.set == SECTION_SET){
+    struct Pad *pad = malloc(sizeof(struct Pad));
+    pad->index.section_start = start;
+    pad->index.section_end = end;
+    pad->index.set = SECTION_SET;
+
+    String number, type, shape;
+    handle_value_token(&start, end, &number);
+    handle_value_token(&start, end, &type);
+    handle_value_token(&start, end, &shape);
+
+    pad->num = number;
+    if(strncmp(type.chars, "thru_hole", type.length) == 0){
+      pad->type = THRU_HOLE;
+    }else if(strncmp(type.chars, "connect", type.length) == 0){
+      pad->type = CONNECT;
+    }else if(strncmp(type.chars, "np_thru_hole", type.length) == 0){
+      pad->type = NP_THRU_HOLE;
+    }else{
+      pad->type = SMD;
+    }
+    free(type.chars);
+    if(strncmp(shape.chars, "circle", shape.length) == 0){
+      pad->shape = CIRCLE;
+    }else if(strncmp(shape.chars, "oval", shape.length) == 0){
+      pad->shape = OVAL;
+    }else if(strncmp(shape.chars, "trapezoid", shape.length) == 0){
+      pad->shape = TRAPEZOID;
+    }else if(strncmp(shape.chars, "roundrect", shape.length) == 0){
+      pad->shape = ROUNDRECT;
+    }/*else if(strncmp(shape.chars, "custom", shape.length) == 0){
+      
+    }*/else{
+      pad->shape = RECT;
+    }
+    free(shape.chars);
+    printf("Pad1: %p", pad);
+
+    if(pcb->footprints->pads == NULL){
+      pcb->footprints->pads = pad;
+    }else{
+      pcb->footprints->pads->prev = pad;
+      pad->next = pcb->footprints->pads;
+      pcb->footprints->pads = pad;
+    }
+    return &pad->index.set;
+  }
+  return NULL;
+}
+
+static int *handle_size(uint64_t start, uint64_t end){
+  if(pcb->footprints &&pcb->footprints->index.set == SECTION_SET && pcb->footprints->pads && pcb->footprints->pads->index.set == SECTION_SET){
+    float width = 0.0, height = 0.0;
+    if(sscanf(&BUFF[start], "(size %f %f)", &width, &height) == 2){
+      printf("Found size: %f %f\n", width, height);
+    }else{
+      printf("Didn\'t find size\n");
+    }
+    pcb->footprints->pads->size.width = width;
+    pcb->footprints->pads->size.height = height;
+  }
+  return NULL;
+}
+
+
+/*
+(pad "1" smd circle
+			(at 0 0)
+			(size 0.5 0.5)
+			(layers "F.Cu" "F.Mask")
+			(net 56 "/Power/VOUT4")
+			(pinfunction "1")
+			(pintype "passive")
+			(solder_mask_margin 0.08)
+			(thermal_bridge_angle 0)
+			(uuid "206ded5f-75ba-4846-91c5-bb7ba245a4d4")
+		)
+*/

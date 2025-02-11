@@ -30,8 +30,8 @@
 #define OPEN 1
 #define CLOSED -1
 
-#define SECTION_SET 1
 #define SECTION_UNSET 0
+#define SECTION_SET 1
 #define SECTION_CLOSED 2
 
 #define LAYER_TYPE_JUMPER 1
@@ -52,15 +52,19 @@
 
 #define THRU_HOLE 1
 #define SMD 2
-#define CONNECT 4
-#define NP_THRU_HOLE 8
+#define CONNECT 3
+#define NP_THRU_HOLE 4
 
 #define CIRCLE 1
 #define RECT 2
-#define OVAL 4
-#define TRAPEZOID 8
-#define ROUNDRECT 16
-#define CUSTOM 32
+#define OVAL 3
+#define TRAPEZOID 4
+#define ROUNDRECT 5
+#define CUSTOM 6
+
+#define NO_CONNECT 0
+#define THERMAL_RELIEF 1
+#define SOLID_FILL 2
 
 typedef struct {
     char *chars;
@@ -181,7 +185,7 @@ struct XYZ{
 };
 
 struct Size{
-  float length, width;
+  float width, height;
 };
 
 struct Line {
@@ -197,11 +201,12 @@ struct Line {
 };
 
 struct Pad {
+  struct Section_Index index;
   String num;
-  int type, shape, function;
+  int type, shape, function, layer_count;
   struct at at;
   struct Size size;
-  struct Layers layers;
+  struct Layer **layers;
   struct Net *net;
   String uuid;
   struct Pad *next, *prev;
@@ -311,3 +316,5 @@ void print_layer();
 void print_footprints(struct Footprint *footprint);
 void print_properties(struct Property *property);
 void print_footprint_properties(struct Footprint_Property *property);
+void print_line(struct Line *line);
+void print_pad(struct Pad *pad);
