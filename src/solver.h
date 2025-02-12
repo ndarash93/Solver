@@ -173,6 +173,7 @@ struct Footprint {
   struct Line *fp_lines;
   struct Pad *pads;
   struct Footprint *prev, *next;
+  struct Model *model;
 };
 
 struct Point {
@@ -212,8 +213,27 @@ struct Pad {
   struct Pad *next, *prev;
 };
 
+struct Offset{
+  struct Section_Index index;
+  struct XYZ xyz;
+};
+
+struct Scale{
+  struct Section_Index index;
+  struct XYZ xyz;
+};
+
+struct Rotate{
+  struct Section_Index index;
+  struct XYZ xyz;
+};
+
 struct Model{
-  struct XYZ offset, scale, rotate;
+  struct Section_Index index;
+  String model;
+  struct Offset offset;
+  struct Scale scale;
+  struct Rotate rotate;
 };
 
 struct File_Buffer {
@@ -318,3 +338,4 @@ void print_properties(struct Property *property);
 void print_footprint_properties(struct Footprint_Property *property);
 void print_line(struct Line *line);
 void print_pad(struct Pad *pad);
+void print_model(struct Model *model);

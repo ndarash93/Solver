@@ -64,6 +64,11 @@ static int *handle_start(uint64_t start, uint64_t end);
 static int *handle_end(uint64_t start, uint64_t end);
 static int *handle_pad(uint64_t start, uint64_t end);
 static int *handle_size(uint64_t start, uint64_t end);
+static int *handle_model(uint64_t start, uint64_t end);
+static int *handle_offset(uint64_t start, uint64_t end);
+static int *handle_scale(uint64_t start, uint64_t end);
+static int *handle_rotate(uint64_t start, uint64_t end);
+static int *handle_xyz(uint64_t start, uint64_t end);
 
 // Handler Helpers
 static int handle_quotes(uint64_t *start, uint64_t end, String *quote);
@@ -123,6 +128,12 @@ void token_table_init(){
   insert(tokens, (char *)"end", handle_end);
   insert(tokens, (char *)"pad", handle_pad);
   insert(tokens, (char *)"size", handle_size);
+  insert(tokens, (char *)"model", handle_model);
+  insert(tokens, (char *)"offset", handle_offset);
+  insert(tokens, (char *)"scale", handle_scale);
+  insert(tokens, (char *)"rotate", handle_rotate);
+  insert(tokens, (char *)"xyz", handle_xyz);
+  //print_table(tokens);
 }
 
 int open_pcb(const char *path){
@@ -320,7 +331,7 @@ static void *search_token(struct table *table, char* key){
   int index = hash(key);
   struct token *token = table->tokens[index];
   struct collision_list *head = table->overflow[index];
-  if (token != NULL){
+  while (token != NULL){
     if (strcmp(token->key, key) == 0)
       return token->handler;
 
@@ -351,6 +362,7 @@ static void print_token(struct token *token){
 
 
 static void handle_collision(struct table *table, unsigned long index, struct token *token){
+  printf("Collision %s\n", token->key);
   struct collision_list *head = table->overflow[index];
   if (head == NULL){
     head = allocate_list();
@@ -730,7 +742,7 @@ static int *handle_layers(uint64_t start, uint64_t end){
       handle_value_token(&start, end, &layer_name);
       layer[i] = find_layer(layer_name);
       free(layer_name.chars);
-      printf("Layer[%d] \"%s\"\n", i, layer[i]->canonical_name.chars);
+      //printf("Layer[%d] \"%s\"\n", i, layer[i]->canonical_name.chars);
     }
     pcb->footprints->pads->layer_count = layer_count;
     pcb->footprints->pads->layers = layer;
@@ -985,6 +997,7 @@ static int *handle_footprint(uint64_t start, uint64_t end){
   footprint->properties = NULL;
   footprint->fp_lines = NULL;
   footprint->pads = NULL;
+  footprint->model = NULL;
 
   
 
@@ -1077,26 +1090,23 @@ static int *handle_track(uint64_t start, uint64_t end){
 
 static int *handle_uuid(uint64_t start, uint64_t end){
   //printf("Handle_UUID\n");
+  String uuid;
+  uuid.chars = NULL;
+  uuid.length = 0;
   if(pcb->footprints && pcb->footprints->index.set == SECTION_SET && pcb->footprints->uuid.chars == NULL){
-    String uuid;
-    uuid.chars = NULL;
     handle_value_token(&start, end, &uuid);
-    //printf("UUID: %s", uuid.chars);
     pcb->footprints->uuid = uuid;
   }
   else if(pcb->footprints && pcb->footprints->index.set == SECTION_SET && pcb->footprints->properties && pcb->footprints->properties->index.set == SECTION_SET){ // Needs work
-    String uuid;
-    uuid.chars = NULL;
-    uuid.length = 0;
     handle_value_token(&start, end, &uuid);
     pcb->footprints->properties->uuid = uuid;
   }
   else if(pcb->footprints && pcb->footprints->index.set == SECTION_SET && pcb->footprints->fp_lines && pcb->footprints->fp_lines->index.set == SECTION_SET){ // Needs work
-    String uuid;
-    uuid.chars = NULL;
-    uuid.length = 0;
     handle_value_token(&start, end, &uuid);
     pcb->footprints->fp_lines->uuid = uuid;
+  }else if(pcb->footprints && pcb->footprints->pads && pcb->footprints->pads->index.set == SECTION_SET){
+    handle_value_token(&start, end, &uuid);
+    pcb->footprints->pads->uuid = uuid;
   }
   return NULL;
 }
@@ -1139,7 +1149,7 @@ static int *handle_descr(uint64_t start, uint64_t end){
 }
 
 static int *handle_fp_line(uint64_t start, uint64_t end){
-  printf("FP_LIME\n");
+  //printf("FP_LIME\n");
   if(pcb->footprints && pcb->footprints->index.set == SECTION_SET){
     struct Line *line = malloc(sizeof(struct Line));
     line->index.section_start = start;
@@ -1221,7 +1231,7 @@ static int *handle_pad(uint64_t start, uint64_t end){
       pad->shape = RECT;
     }
     free(shape.chars);
-    printf("Pad1: %p", pad);
+    //printf("Pad1: %p", pad);
 
     if(pcb->footprints->pads == NULL){
       pcb->footprints->pads = pad;
@@ -1249,17 +1259,84 @@ static int *handle_size(uint64_t start, uint64_t end){
   return NULL;
 }
 
+static int *handle_model(uint64_t start, uint64_t end){
+  printf("Handle Model\n");
+  if(pcb->footprints && pcb->footprints->index.set == SECTION_SET && pcb->footprints->model == NULL){
+    struct Model *model = malloc(sizeof(struct Model));
+    model->index.section_start = start;
+    model->index.section_end = end;
+    model->index.set = SECTION_SET;
+    handle_value_token(&start, end, &model->model);
+    pcb->footprints->model = model;
+    return &model->index.set;
+  }  
+  return NULL;
+}
+
+static int *handle_offset(uint64_t start, uint64_t end){
+  if(pcb->footprints && pcb->footprints->index.set == SECTION_SET && pcb->footprints->model && pcb->footprints->model->index.set == SECTION_SET){
+    struct Offset offset;
+    offset.index.set = SECTION_SET;
+    offset.index.section_start = start;
+    offset.index.section_end = end;
+    pcb->footprints->model->offset = offset;
+    return &pcb->footprints->model->offset.index.set;
+  }
+  return NULL;
+}
+
+static int *handle_scale(uint64_t start, uint64_t end){
+  if(pcb->footprints && pcb->footprints->index.set == SECTION_SET && pcb->footprints->model && pcb->footprints->model->index.set == SECTION_SET){
+    struct Scale scale;
+    scale.index.set = SECTION_SET;
+    scale.index.section_start = start;
+    scale.index.section_end = end;
+    pcb->footprints->model->scale = scale;
+    return &pcb->footprints->model->scale.index.set;
+  }
+  return NULL;
+}
+
+static int *handle_rotate(uint64_t start, uint64_t end){
+  if(pcb->footprints && pcb->footprints->index.set == SECTION_SET && pcb->footprints->model && pcb->footprints->model->index.set == SECTION_SET){
+    struct Rotate rotate;
+    rotate.index.set = SECTION_SET;
+    rotate.index.section_start = start;
+    rotate.index.section_end = end;
+    pcb->footprints->model->rotate = rotate;
+    return &pcb->footprints->model->rotate.index.set;
+  }
+  return NULL;
+}
+
+static int *handle_xyz(uint64_t start, uint64_t end){
+  if(pcb->footprints && pcb->footprints->index.set == SECTION_SET && pcb->footprints->model && pcb->footprints->model->index.set == SECTION_SET){
+    struct Model *model = pcb->footprints->model;
+    struct XYZ xyz;
+    if(sscanf(&BUFF[start], "(xyz %f %f %f)", &xyz.x, &xyz.y, &xyz.z) != 3){
+      printf("Failed to get XYZ\n");
+    }
+    if(model->offset.index.set == SECTION_SET){
+      model->offset.xyz = xyz;
+    }else if(model->scale.index.set == SECTION_SET){
+      model->scale.xyz = xyz;
+    }else if(model->rotate.index.set == SECTION_SET){
+      model->rotate.xyz = xyz;
+    }
+  }
+  return NULL;
+}
 
 /*
-(pad "1" smd circle
-			(at 0 0)
-			(size 0.5 0.5)
-			(layers "F.Cu" "F.Mask")
-			(net 56 "/Power/VOUT4")
-			(pinfunction "1")
-			(pintype "passive")
-			(solder_mask_margin 0.08)
-			(thermal_bridge_angle 0)
-			(uuid "206ded5f-75ba-4846-91c5-bb7ba245a4d4")
+(model "${KICAD8_3DMODEL_DIR}/Resistor_SMD.3dshapes/R_0402_1005Metric.wrl"
+			(offset
+				(xyz 0 0 0)
+			)
+			(scale
+				(xyz 1 1 1)
+			)
+			(rotate
+				(xyz 0 0 0)
+			)
 		)
 */

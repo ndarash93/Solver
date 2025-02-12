@@ -20,6 +20,7 @@ int main(int argc, char **argv){
   //    printf("(\n\tNet: %p,\n\tOrdinal: %d,\n\tName: \"%s\",\n\tnext: %p,\n\tprev: %p\n)\n", temp, temp->ordinal, temp->name.chars, temp->next, temp->prev);
   //  }
   print_footprints(pcb->footprints);
+  //print_tracks
   free_pcb();
 
   return EXIT_SUCCESS;
@@ -90,6 +91,10 @@ void free_pcb(){
           free(temp_pad->layers);
           free(temp_pad);
         }
+      }
+      if(temp->model){
+        free(temp->model->model.chars);
+        free(temp->model);
       }
     free(temp->attr.chars);
     free(temp->description.chars);
