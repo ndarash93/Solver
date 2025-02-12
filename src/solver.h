@@ -243,6 +243,79 @@ struct File_Buffer {
 
 struct Graphic {
   struct Section_Index index;
+  struct Text *gr_text;
+  struct Text_Box *gr_text_box;
+  struct Rect *gr_rect;
+  struct Circle *gr_circle;
+  struct Arc *gr_arc;
+  struct Polygon *polygon;
+  struct Curve *curve;
+};
+
+struct Text{
+  struct Section_Index index;
+  struct Point pos;
+  struct Layer *layer;
+  String uuid;
+};
+
+struct Text_Box{
+  struct Section_Index index;
+  struct Point pos;
+  struct Layer *layer;
+  String uuid;
+};
+
+struct Rect{
+  struct Section_Index index;
+  struct Point start, end;
+  struct Layer *layer;
+  float width;
+  int fill;
+  String uuid;
+  struct Graphical_Rect *next, *prev;
+};
+
+struct Circle{
+  struct Section_Index index;
+  struct Point center, end;                                 
+  struct Layer *layer;
+  float width;
+  int fill;
+  String uuid;
+};
+
+/*  Duplicate struct except track arcs has a net pointer
+    can be NULL for all other uses except tracks
+struct Arc{
+  struct Point start, mid, end;
+  struct Layer *layer;
+  float width;
+  String uuid;
+};
+*/
+
+struct Polygon{
+  struct Section_Index index;
+  struct Point **points;
+  struct Layer *layer;
+  float width;
+  int fill;
+  String uuid;
+};
+
+struct Curve{
+  struct Section_Index index;
+  struct Point **points;
+  struct Layer *layer;
+  float width;
+  String uuid;
+};
+
+struct Drill{
+  struct Section_Index index;
+  float diameter;
+  struct Point offset;
 };
 
 struct Images{
@@ -263,7 +336,8 @@ struct Segment{
 };
 
 struct Arc{
-  struct Point start, end, width, mid;
+  struct Point start, end, mid;
+  float width;
   struct Layer *layer;
   struct Net *net;
   String uuid;
@@ -294,7 +368,9 @@ struct Zone {
   struct Layer *layer;
   String uuid;
   uint32_t priority;
-  struct Point *points;
+  int hatch, connect_pads, fill;
+  float min_thickness;
+  struct Point **points, **filled_points;
   struct Zone *next, *prev;
 };
 
