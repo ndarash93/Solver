@@ -1327,6 +1327,10 @@ static int *handle_xyz(uint64_t start, uint64_t end){
   return NULL;
 }
 
+static int handle_text(uint64_t start, uint64_t end){
+
+}
+
 static int handle_rect(uint64_t start, uint64_t end){
   if(pcb->kicad_pcb.set == SECTION_SET){
     struct Rect *rect = malloc(sizeof(struct Rect));
@@ -1341,6 +1345,26 @@ static int handle_rect(uint64_t start, uint64_t end){
     return &rect->index.set;
   }
   return NULL;
+}
+
+static int handle_circle(uint64_t start, uint64_t end){
+
+}
+
+static int handle_arc(uint64_t start, uint64_t end){
+
+}
+
+static int handle_polygon(uint64_t start, uint64_t end){
+
+}
+
+static int handle_curve(uint64_t start, uint64_t end){
+
+}
+
+static int handle_bounding_box(uint64_t start, uint64_t end){
+  
 }
 
 /*

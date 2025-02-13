@@ -368,8 +368,8 @@ struct Zone {
   struct Layer *layer;
   String uuid;
   uint32_t priority;
-  int hatch, connect_pads, fill;
-  float min_thickness;
+  int hatch_style, connect_pads, fill;
+  float min_thickness, hatch_pitch;
   struct Point **points, **filled_points;
   struct Zone *next, *prev;
 };
