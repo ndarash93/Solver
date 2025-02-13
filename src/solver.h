@@ -170,7 +170,13 @@ struct Footprint {
     struct Footprint_Property *next, *prev;
   } *properties;
   String path, sheetname, sheetfile, attr;
+  struct Text *fp_texts;
   struct Line *fp_lines;
+  struct Rect *fp_rects;
+  struct Circule *fp_circles;
+  struct Arc *fp_arcs;
+  struct Polygon *fp_poly;
+  struct Curve *fp_curve;
   struct Pad *pads;
   struct Footprint *prev, *next;
   struct Model *model;
@@ -314,7 +320,8 @@ struct Curve{
 
 struct Drill{
   struct Section_Index index;
-  float diameter;
+  int oval;
+  float diameter, width;
   struct Point offset;
 };
 
@@ -345,8 +352,9 @@ struct Arc{
 
 struct Via{
   struct at at;
-  float size, drill;
-  struct Layers layers;
+  float size;
+  struct Drill drill;
+  struct Layer **layers;
   struct Net *net;
   String uuid;
 };
@@ -355,12 +363,22 @@ struct Track{
   struct Section_Index index;
   int type;
   union {
-    struct Segment *segment;
-    struct Arc *arc;
-    struct Via *via;
+    struct Segment segment;
+    struct Arc arc;
+    struct Via via;
   } track;
   struct Track *prev, *next;
 };
+
+/*
+struct Track{
+  struct Section_Index index;
+  int type;
+  struct Point start, end, mid;
+
+  struct Track *prev, *next;
+};
+*/
 
 struct Zone {
   struct Section_Index index;

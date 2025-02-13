@@ -1327,19 +1327,44 @@ static int *handle_xyz(uint64_t start, uint64_t end){
   return NULL;
 }
 
-static int handle_text(uint64_t start, uint64_t end){
+static int *handle_via(uint64_t start, uint64_t end){
+  //struct Via *via = malloc(sizeof(struct Via));
+  struct Track *track = malloc(sizeof(struct Track));
+  track->index.set = SECTION_SET;
+  track->index.section_start = start;
+  track->index.section_end = end;
+  track->type = TRACK_TYPE_VIA;
+  
 
+  return &track->index.set;
 }
 
-static int handle_rect(uint64_t start, uint64_t end){
-  if(pcb->kicad_pcb.set == SECTION_SET){
+static int *handle_drill(uint64_t start, uint64_t end){
+  if(pcb->tracks && pcb->tracks->index.set == SECTION_SET && pcb->tracks->.type == TRACK_TYPE_VIA){
+    float diameter;
+    //handle_value_token(&start, end, &diameter);
+    if(sscanf(&BUFF[start], "(drill %f", &diameter) != 1){
+      printf("Missed capturing drill width\n");
+    }
+    pcb->tracks->track.via->drill.diameter = diameter;
+  }
+  return NULL;
+}
+
+/*
+static int *handle_text(uint64_t start, uint64_t end){
+  return NULL;
+}
+
+static int *handle_rect(uint64_t start, uint64_t end){
+  if(pcb->footprints && pcb->footprints->index.set == SECTION_SET){
     struct Rect *rect = malloc(sizeof(struct Rect));
     rect->index.section_start = start;
     rect->index.section_end = end;
     rect->index.set == SECTION_SET;
 
-    if(pcb->graphics.gr_rect == NULL){
-
+    if(pcb->footprints->fp_rects == NULL){
+      
     }
 
     return &rect->index.set;
@@ -1347,58 +1372,26 @@ static int handle_rect(uint64_t start, uint64_t end){
   return NULL;
 }
 
-static int handle_circle(uint64_t start, uint64_t end){
-
+static int *handle_circle(uint64_t start, uint64_t end){
+  if(pcb->kicad_pcb.set == SECTION_SET){
+    struct Circle *circle = malloc(sizeof(struct Circle));
+  }
+  return NULL;
 }
 
-static int handle_arc(uint64_t start, uint64_t end){
-
+static int *handle_arc(uint64_t start, uint64_t end){
+  return NULL;
 }
 
-static int handle_polygon(uint64_t start, uint64_t end){
-
+static int *handle_polygon(uint64_t start, uint64_t end){
+  return NULL;
 }
 
-static int handle_curve(uint64_t start, uint64_t end){
-
+static int *handle_curve(uint64_t start, uint64_t end){
+  return NULL;
 }
 
-static int handle_bounding_box(uint64_t start, uint64_t end){
-  
+static int *handle_bounding_box(uint64_t start, uint64_t end){
+  return NULL;
 }
-
-/*
-	(gr_rect
-		(start 99.5 64.5)
-		(end 125 84.5)
-		(stroke
-			(width 0.05)
-			(type default)
-		)
-		(fill none)
-		(layer "Edge.Cuts")
-		(uuid "dc96d63f-1b65-4c06-ab7c-2cffb23369a3")
-	)
-
-(fp_line
-  (start 0.8 0.4)
-  (end 0.8 -0.4)
-  (stroke
-    (width 0.1)
-    (type solid)
-  )
-  (layer "F.Fab")
-  (uuid "d85e97f1-9ef9-451b-8cff-7467ddc7c19c")
-)
-
-	(gr_line
-		(start 111 94)
-		(end 34 94)
-		(stroke
-			(width 0.05)
-			(type default)
-		)
-		(layer "Edge.Cuts")
-		(uuid "81433627-f94a-4b6b-8c82-590efdae9c20")
-	)
 */
