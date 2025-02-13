@@ -339,7 +339,7 @@ struct Segment{
   float width;
   struct Layer *layer;
   struct Net *net;
-  String uuid;
+  //String uuid;
 };
 
 struct Arc{
@@ -347,16 +347,17 @@ struct Arc{
   float width;
   struct Layer *layer;
   struct Net *net;
-  String uuid;
+  //String uuid;
 };
 
 struct Via{
   struct at at;
   float size;
   struct Drill drill;
+  int layer_count;
   struct Layer **layers;
   struct Net *net;
-  String uuid;
+  //String uuid;
 };
 
 struct Track{
@@ -367,6 +368,7 @@ struct Track{
     struct Arc arc;
     struct Via via;
   } track;
+  String uuid;
   struct Track *prev, *next;
 };
 
@@ -433,3 +435,4 @@ void print_footprint_properties(struct Footprint_Property *property);
 void print_line(struct Line *line);
 void print_pad(struct Pad *pad);
 void print_model(struct Model *model);
+void print_tracks(struct Track *track);

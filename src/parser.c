@@ -10,6 +10,8 @@
 
 #define COPY(token, index, buff) (token[(index++)] = BUFF[(buff++)])
 
+#define PUSH(new, list) (list == NULL) ? (list = new) : (list->prev = new; new->next = list; list = new;)
+
 // Hash table
 static int token_lookup(const char *token);
 static unsigned long hash(const char *token);
@@ -54,7 +56,7 @@ static int *handle_pcbplotparams(uint64_t start, uint64_t end);
 static int *handle_net(uint64_t start, uint64_t end);
 static int *handle_footprint(uint64_t start, uint64_t end);
 static int *handle_zone(uint64_t start, uint64_t end);
-static int *handle_track(uint64_t start, uint64_t end);
+//static int *handle_track(uint64_t start, uint64_t end);
 static int *handle_uuid(uint64_t start, uint64_t end);
 static int *handle_property(uint64_t start, uint64_t end);
 static int *handle_descr(uint64_t start, uint64_t end);
@@ -69,6 +71,11 @@ static int *handle_offset(uint64_t start, uint64_t end);
 static int *handle_scale(uint64_t start, uint64_t end);
 static int *handle_rotate(uint64_t start, uint64_t end);
 static int *handle_xyz(uint64_t start, uint64_t end);
+static int *handle_via(uint64_t start, uint64_t end);
+static int *handle_segment(uint64_t start, uint64_t end);
+static int *handle_drill(uint64_t start, uint64_t end);
+static int *handle_arc(uint64_t start, uint64_t end);
+static int *handle_width(uint64_t start, uint64_t end);
 
 // Handler Helpers
 static int handle_quotes(uint64_t *start, uint64_t end, String *quote);
@@ -116,9 +123,9 @@ void token_table_init(){
   insert(tokens, (char *)"net", handle_net);
   insert(tokens, (char *)"footprint", handle_footprint);
   insert(tokens, (char *)"zone", handle_zone);
-  insert(tokens, (char *)"via", handle_track);
-  insert(tokens, (char *)"segment", handle_track);
-  insert(tokens, (char *)"arc", handle_track);
+  insert(tokens, (char *)"via", handle_via);
+  insert(tokens, (char *)"segment", handle_segment);
+  insert(tokens, (char *)"arc", handle_arc);
   insert(tokens, (char *)"uuid", handle_uuid);
   insert(tokens, (char *)"property", handle_property);
   insert(tokens, (char *)"descr", handle_descr);
@@ -133,6 +140,7 @@ void token_table_init(){
   insert(tokens, (char *)"scale", handle_scale);
   insert(tokens, (char *)"rotate", handle_rotate);
   insert(tokens, (char *)"xyz", handle_xyz);
+  insert(tokens, (char *)"width", handle_width);
   //print_table(tokens);
 }
 
@@ -735,7 +743,6 @@ static int *handle_layers(uint64_t start, uint64_t end){
         layer_count++;
       }
     }
-    printf("LAYER COUNT: %d\n", layer_count);
     struct Layer **layer = calloc(layer_count, sizeof(struct Layer *));
     String layer_name;
     for(int i = 0; i < layer_count; i++){
@@ -746,6 +753,23 @@ static int *handle_layers(uint64_t start, uint64_t end){
     }
     pcb->footprints->pads->layer_count = layer_count;
     pcb->footprints->pads->layers = layer;
+  }else if(pcb->tracks && pcb->tracks->index.set == SECTION_SET && pcb->tracks->type == TRACK_TYPE_VIA){
+    int layer_count = 0, index = start;
+    while(++index < end){
+      if(BUFF[index] == ' '){
+        layer_count++;
+      }
+    }
+    struct Layer **layer = calloc(layer_count, sizeof(struct Layer *));
+    String layer_name;
+    for(int i = 0; i < layer_count; i++){
+      handle_value_token(&start, end, &layer_name);
+      layer[i] = find_layer(layer_name);
+      free(layer_name.chars);
+      printf("Layer[%d] \"%s\"\n", i, layer[i]->canonical_name.chars);
+    }
+    pcb->tracks->track.via.layer_count = layer_count;
+    pcb->tracks->track.via.layers = layer;
   }
   return NULL;
 }
@@ -828,6 +852,16 @@ static int *handle_layer(uint64_t start, uint64_t end){
     name.chars = NULL;
     handle_value_token(&start, end, &name);
     pcb->footprints->fp_lines->layer = find_layer(name);
+    free(name.chars);
+  }else if(pcb->tracks && pcb->tracks->index.set == SECTION_SET){
+    String name;
+    name.chars = NULL;
+    handle_value_token(&start, end, &name);
+    if(pcb->tracks->type == TRACK_TYPE_ARC){
+      pcb->tracks->track.arc.layer = find_layer(name);
+    }else if(pcb->tracks->type == TRACK_TYPE_SEG){
+      pcb->tracks->track.segment.layer = find_layer(name);
+    }
     free(name.chars);
   }
   return NULL;
@@ -928,6 +962,12 @@ static int *handle_pcbplotparams(uint64_t start, uint64_t end){
 
 static int *handle_net(uint64_t start, uint64_t end){
   //printf("Handle Net1\n");
+  int ordinal = -1;
+  struct Net *net;
+  if(sscanf(&BUFF[start], "(net %d \"%*s\")", &ordinal) != 1){
+    printf("Net error\n");
+  }
+  net = find_net(ordinal);
   if(pcb->footprints && pcb->footprints->index.set == SECTION_SET && pcb->footprints->pads && pcb->footprints->pads->index.set == SECTION_SET){
     String ordinal_S;
     int ordinal = -1;
@@ -938,7 +978,17 @@ static int *handle_net(uint64_t start, uint64_t end){
     net = find_net(ordinal);
     pcb->footprints->pads->net = net;
   }else if(pcb->tracks && pcb->tracks->index.set == SECTION_SET){
-
+    switch(pcb->tracks->type){
+      case TRACK_TYPE_VIA:
+        pcb->tracks->track.via.net = net;
+        break;
+      case TRACK_TYPE_ARC:
+        pcb->tracks->track.arc.net = net;
+        break;
+      case TRACK_TYPE_SEG:
+        pcb->tracks->track.segment.net = net;
+        break;
+    }
   }else if (pcb->zones && pcb->zones->index.set == SECTION_SET){
 
   }else{
@@ -1071,8 +1121,7 @@ static int *handle_zone(uint64_t start, uint64_t end){
   return &pcb->zones->index.set;
 }
 
-static int *handle_track(uint64_t start, uint64_t end){
-  //printf("Handle Track1\n");
+/*static int *handle_track(uint64_t start, uint64_t end){
   struct Track *track = malloc(sizeof(struct Track));
   track->index.section_start = start;
   track->index.section_end = end;
@@ -1084,29 +1133,29 @@ static int *handle_track(uint64_t start, uint64_t end){
     track->next = pcb->tracks;
     pcb->tracks = track;
   }
-  //printf("Handle Track2\n");
   return &pcb->tracks->index.set;
-}
+}*/
 
 static int *handle_uuid(uint64_t start, uint64_t end){
   //printf("Handle_UUID\n");
   String uuid;
   uuid.chars = NULL;
   uuid.length = 0;
-  if(pcb->footprints && pcb->footprints->index.set == SECTION_SET && pcb->footprints->uuid.chars == NULL){
-    handle_value_token(&start, end, &uuid);
+  handle_value_token(&start, end, &uuid);
+  if(pcb->footprints && pcb->footprints->index.set == SECTION_SET && pcb->footprints->uuid.chars == NULL){   
     pcb->footprints->uuid = uuid;
   }
   else if(pcb->footprints && pcb->footprints->index.set == SECTION_SET && pcb->footprints->properties && pcb->footprints->properties->index.set == SECTION_SET){ // Needs work
-    handle_value_token(&start, end, &uuid);
     pcb->footprints->properties->uuid = uuid;
   }
   else if(pcb->footprints && pcb->footprints->index.set == SECTION_SET && pcb->footprints->fp_lines && pcb->footprints->fp_lines->index.set == SECTION_SET){ // Needs work
-    handle_value_token(&start, end, &uuid);
     pcb->footprints->fp_lines->uuid = uuid;
   }else if(pcb->footprints && pcb->footprints->pads && pcb->footprints->pads->index.set == SECTION_SET){
-    handle_value_token(&start, end, &uuid);
     pcb->footprints->pads->uuid = uuid;
+  }else if(pcb->tracks && pcb->tracks->index.set == SECTION_SET){
+    pcb->tracks->uuid = uuid;
+  }else{
+    free(uuid.chars);
   }
   return NULL;
 }
@@ -1132,6 +1181,8 @@ static int *handle_at(uint64_t start, uint64_t end){
     pcb->footprints->pads->at = at;
   }else if(pcb->footprints && pcb->footprints->index.set == SECTION_SET){
     pcb->footprints->at = at;
+  }else if(pcb->tracks && pcb->tracks->index.set == SECTION_SET && pcb->tracks->type == TRACK_TYPE_VIA){
+    pcb->tracks->track.via.at = at;
   }
   return NULL;
 }
@@ -1169,27 +1220,50 @@ static int *handle_fp_line(uint64_t start, uint64_t end){
 }
 
 static int *handle_start(uint64_t start, uint64_t end){
-  if(pcb->footprints->fp_lines && pcb->footprints->fp_lines->index.set == SECTION_SET){
-    struct Point point;
-    if(sscanf(&BUFF[start], "(start %f %f)", &point.x, &point.y) == 2){
+  struct Point point;
+  if(sscanf(&BUFF[start], "(start %f %f)", &point.x, &point.y) == 2){
 
-    }else{
-      fprintf(stderr, "Weird error");
-    }
+  }else{
+    fprintf(stderr, "Weird error");
+  }
+  if(pcb->footprints->fp_lines && pcb->footprints->fp_lines->index.set == SECTION_SET){
     pcb->footprints->fp_lines->start = point;
+  }else if(pcb->tracks && pcb->tracks->index.set == SECTION_SET && pcb->tracks->type == TRACK_TYPE_SEG){
+    pcb->tracks->track.segment.start = point;
+  }else if(pcb->tracks && pcb->tracks->index.set == SECTION_SET && pcb->tracks->type == TRACK_TYPE_ARC){
+    pcb->tracks->track.arc.start = point;
   }
   return NULL;
 }
 
 static int *handle_end(uint64_t start, uint64_t end){
-  if(pcb->footprints->fp_lines && pcb->footprints->fp_lines->index.set == SECTION_SET){
-    struct Point point;
-    if(sscanf(&BUFF[start], "(end %f %f)", &point.x, &point.y) == 2){
+  struct Point point;
+  if(sscanf(&BUFF[start], "(end %f %f)", &point.x, &point.y) == 2){
 
-    }else{
-      fprintf(stderr, "Weird error");
-    }
+  }else{
+    fprintf(stderr, "Weird error");
+  }
+  if(pcb->footprints->fp_lines && pcb->footprints->fp_lines->index.set == SECTION_SET){
     pcb->footprints->fp_lines->end = point;
+  }else if(pcb->tracks && pcb->tracks->index.set == SECTION_SET && pcb->tracks->type == TRACK_TYPE_SEG){
+    pcb->tracks->track.segment.end = point;
+  }else if(pcb->tracks && pcb->tracks->index.set == SECTION_SET && pcb->tracks->type == TRACK_TYPE_ARC){
+    pcb->tracks->track.arc.end = point;
+  }
+  return NULL;
+}
+
+static int *handle_width(uint64_t start, uint64_t end){
+  float width = 0.0;
+  if(sscanf(&BUFF[start], "(width %f)", &width) == 1){
+
+  }else{
+    fprintf(stderr, "Weird error");
+  }
+  if(pcb->tracks && pcb->tracks->index.set == SECTION_SET && pcb->tracks->type == TRACK_TYPE_ARC){
+    pcb->tracks->track.arc.width = width;
+  }else if(pcb->tracks && pcb->tracks->index.set == SECTION_SET && pcb->tracks->type == TRACK_TYPE_SEG){
+    pcb->tracks->track.segment.width = width;
   }
   return NULL;
 }
@@ -1246,15 +1320,20 @@ static int *handle_pad(uint64_t start, uint64_t end){
 }
 
 static int *handle_size(uint64_t start, uint64_t end){
+  struct Size size;
+  size.height = 0.0;
+  size.width = 0.0;
+  if(sscanf(&BUFF[start], "(size %f %f)", &size.width, &size.height) == 2){
+    printf("Found size: %f %f\n", size.width, size.height);
+  }else if(sscanf(&BUFF[start], "(size %f)", &size.width) == 1){
+    printf("Found size: %f\n", size.width);
+  }else{
+    printf("Didn\'t find size\n");
+  }
   if(pcb->footprints &&pcb->footprints->index.set == SECTION_SET && pcb->footprints->pads && pcb->footprints->pads->index.set == SECTION_SET){
-    float width = 0.0, height = 0.0;
-    if(sscanf(&BUFF[start], "(size %f %f)", &width, &height) == 2){
-      printf("Found size: %f %f\n", width, height);
-    }else{
-      printf("Didn\'t find size\n");
-    }
-    pcb->footprints->pads->size.width = width;
-    pcb->footprints->pads->size.height = height;
+    pcb->footprints->pads->size = size;
+  }else if(pcb->tracks && pcb->tracks->index.set == SECTION_SET && pcb->tracks->type == TRACK_TYPE_VIA){
+    pcb->tracks->track.via.size = size.width;
   }
   return NULL;
 }
@@ -1334,22 +1413,61 @@ static int *handle_via(uint64_t start, uint64_t end){
   track->index.section_start = start;
   track->index.section_end = end;
   track->type = TRACK_TYPE_VIA;
-  
-
+  if(pcb->tracks == NULL){
+    pcb->tracks = track;
+  }else{
+    pcb->tracks->prev = track;
+    track->next = pcb->tracks;
+    pcb->tracks = track;
+  }
   return &track->index.set;
 }
 
+static int *handle_segment(uint64_t start, uint64_t end){
+  struct Track *track = malloc(sizeof(struct Track));
+  track->index.set = SECTION_SET;
+  track->index.section_start = start;
+  track->index.section_end = end;
+  track->type = TRACK_TYPE_SEG;
+  if(pcb->tracks == NULL){
+    pcb->tracks = track;
+  }else{
+    pcb->tracks->prev = track;
+    track->next = pcb->tracks;
+    pcb->tracks = track;
+  }
+  return &track->index.set;
+}
+
+
+
 static int *handle_drill(uint64_t start, uint64_t end){
-  if(pcb->tracks && pcb->tracks->index.set == SECTION_SET && pcb->tracks->.type == TRACK_TYPE_VIA){
-    float diameter;
-    //handle_value_token(&start, end, &diameter);
-    if(sscanf(&BUFF[start], "(drill %f", &diameter) != 1){
+  float diameter;
+  if(sscanf(&BUFF[start], "(drill %f", &diameter) != 1){
       printf("Missed capturing drill width\n");
     }
-    pcb->tracks->track.via->drill.diameter = diameter;
+  if(pcb->tracks && pcb->tracks->index.set == SECTION_SET && pcb->tracks->type == TRACK_TYPE_VIA){
+    pcb->tracks->track.via.drill.diameter = diameter;
   }
   return NULL;
 }
+
+static int *handle_arc(uint64_t start, uint64_t end){
+  struct Track *track = malloc(sizeof(struct Track));
+  track->index.set = SECTION_SET;
+  track->index.section_start = start;
+  track->index.section_end = end;
+  track->type = TRACK_TYPE_SEG;
+  if(pcb->tracks == NULL){
+    pcb->tracks = track;
+  }else{
+    pcb->tracks->prev = track;
+    track->next = pcb->tracks;
+    pcb->tracks = track;
+  }
+  return &track->index.set;
+}
+
 
 /*
 static int *handle_text(uint64_t start, uint64_t end){

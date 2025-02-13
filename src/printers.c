@@ -74,3 +74,45 @@ void print_model(struct Model *model){
     printf("(rotate\n(xyz %f %f %f)\n)\n)\n", model->rotate.xyz.x, model->rotate.xyz.y, model->rotate.xyz.z);
   }
 }
+
+void print_tracks(struct Track *track){
+  while(track){
+    switch (track->type)
+    {
+    case TRACK_TYPE_VIA:
+      printf("(via\n");
+      printf("(at %f %f)\n", track->track.via.at.x, track->track.via.at.y);
+      printf("(size %f)\n", track->track.via.size);
+      printf("(drill %f)\n", track->track.via.drill.diameter);
+      printf("(layers");
+      for(int i = 0; i < track->track.via.layer_count; i++){
+        printf(" \"%s\"", track->track.via.layers[i]->canonical_name.chars);
+      }
+      printf(")\n");
+      printf("(net %d)\n", track->track.via.net->ordinal);
+      break;
+    case TRACK_TYPE_SEG:
+      printf("(segment\n");
+      printf("(start %f %f)\n", track->track.segment.start.x, track->track.segment.start.y);
+      printf("(end %f %f)\n", track->track.segment.end.x, track->track.segment.end.y);
+      printf("(width %f)\n", track->track.segment.width);
+      printf("(layer \"%s\")\n", track->track.segment.layer->canonical_name.chars);
+      printf("(net %d)\n", track->track.segment.net->ordinal);
+      break;
+    case TRACK_TYPE_ARC:
+      printf("(arc\n");
+      printf("(start %f %f)\n", track->track.arc.start.x, track->track.arc.start.y);
+      printf("(mid %f %f)\n", track->track.arc.mid.x, track->track.arc.mid.y);
+      printf("(end %f %f)\n", track->track.arc.end.x, track->track.arc.end.y);
+      printf("(width %f)\n", track->track.arc.width);
+      printf("(layer \"%s\")\n", track->track.arc.layer->canonical_name.chars);
+      printf("(start %d)\n", track->track.arc.net->ordinal);
+      break;
+    default:
+      printf("(unknown\n");
+      break;
+    }
+    printf("(uuid %s)\n", track->uuid.chars);
+    track = track->next;
+  }
+}

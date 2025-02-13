@@ -12,15 +12,10 @@ int main(int argc, char **argv){
     return EXIT_FAILURE;
   }
   token_table_init();
-  printf("1\n");
   open_pcb(argv[1]);
   
-  //print_pcb();
-  //for (struct Net *temp = pcb->nets; temp; temp = temp->next){
-  //    printf("(\n\tNet: %p,\n\tOrdinal: %d,\n\tName: \"%s\",\n\tnext: %p,\n\tprev: %p\n)\n", temp, temp->ordinal, temp->name.chars, temp->next, temp->prev);
-  //  }
   print_footprints(pcb->footprints);
-  //print_tracks
+  print_tracks(pcb->tracks);
   free_pcb();
 
   return EXIT_SUCCESS;
@@ -107,11 +102,12 @@ void free_pcb(){
     struct Track *temp = track;
     track = track->next;
     if(temp->type == TRACK_TYPE_ARC){
-      free(temp->track.arc->uuid.chars);
+      free(temp->uuid.chars);
     }else if(temp->type == TRACK_TYPE_SEG){
-      free(temp->track.segment->uuid.chars);
+      free(temp->uuid.chars);
     }else if(temp->type == TRACK_TYPE_VIA){
-      free(temp->track.via->uuid.chars);
+      free(temp->uuid.chars);
+      free(temp->track.via.layers);
     }
     free(temp);
   }
