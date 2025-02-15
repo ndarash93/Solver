@@ -85,7 +85,7 @@ void *mem_track_malloc(size_t size, const int line, const char *function, const 
 }
 
 void *mem_track_calloc(size_t num, size_t size, const int line, const char *function, const char *file){
-  printf("Callocing\n");
+  //printf("Callocing\n");
   void *ptr = calloc(num, size);
   if(ptr){
     mem_track(ptr, num*size, line, function, file);

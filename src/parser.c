@@ -766,7 +766,7 @@ static int *handle_layers(uint64_t start, uint64_t end){
       handle_value_token(&start, end, &layer_name);
       layer[i] = find_layer(layer_name);
       free(layer_name.chars);
-      printf("Layer[%d] \"%s\"\n", i, layer[i]->canonical_name.chars);
+      //printf("Layer[%d] \"%s\"\n", i, layer[i]->canonical_name.chars);
     }
     pcb->tracks->track.via.layer_count = layer_count;
     pcb->tracks->track.via.layers = layer;
@@ -1224,7 +1224,7 @@ static int *handle_start(uint64_t start, uint64_t end){
   if(sscanf(&BUFF[start], "(start %f %f)", &point.x, &point.y) == 2){
 
   }else{
-    fprintf(stderr, "Weird error");
+    fprintf(stderr, "Weird start\n");
   }
   if(pcb->footprints->fp_lines && pcb->footprints->fp_lines->index.set == SECTION_SET){
     pcb->footprints->fp_lines->start = point;
@@ -1241,7 +1241,7 @@ static int *handle_end(uint64_t start, uint64_t end){
   if(sscanf(&BUFF[start], "(end %f %f)", &point.x, &point.y) == 2){
 
   }else{
-    fprintf(stderr, "Weird error");
+    fprintf(stderr, "Weird end\n");
   }
   if(pcb->footprints->fp_lines && pcb->footprints->fp_lines->index.set == SECTION_SET){
     pcb->footprints->fp_lines->end = point;
@@ -1258,7 +1258,7 @@ static int *handle_width(uint64_t start, uint64_t end){
   if(sscanf(&BUFF[start], "(width %f)", &width) == 1){
 
   }else{
-    fprintf(stderr, "Weird error");
+    fprintf(stderr, "Weird width\n");
   }
   if(pcb->tracks && pcb->tracks->index.set == SECTION_SET && pcb->tracks->type == TRACK_TYPE_ARC){
     pcb->tracks->track.arc.width = width;
@@ -1324,9 +1324,9 @@ static int *handle_size(uint64_t start, uint64_t end){
   size.height = 0.0;
   size.width = 0.0;
   if(sscanf(&BUFF[start], "(size %f %f)", &size.width, &size.height) == 2){
-    printf("Found size: %f %f\n", size.width, size.height);
+    //printf("Found size: %f %f\n", size.width, size.height);
   }else if(sscanf(&BUFF[start], "(size %f)", &size.width) == 1){
-    printf("Found size: %f\n", size.width);
+    //printf("Found size: %f\n", size.width);
   }else{
     printf("Didn\'t find size\n");
   }
@@ -1339,7 +1339,7 @@ static int *handle_size(uint64_t start, uint64_t end){
 }
 
 static int *handle_model(uint64_t start, uint64_t end){
-  printf("Handle Model\n");
+  //printf("Handle Model\n");
   if(pcb->footprints && pcb->footprints->index.set == SECTION_SET && pcb->footprints->model == NULL){
     struct Model *model = malloc(sizeof(struct Model));
     model->index.section_start = start;
