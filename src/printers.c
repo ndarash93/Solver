@@ -11,10 +11,10 @@ void print_footprints(struct Footprint *footprint){
     printf("(uuid \"%s\")\n", footprint->uuid.chars);
     printf("(at %f %f %f)\n", footprint->at.x, footprint->at.y, footprint->at.angle);
     printf("(descr \"%s\")\n", footprint->description.chars);
-    print_footprint_properties(footprint->properties);
-    print_line(footprint->fp_lines);
-    print_pad(footprint->pads);
-    print_model(footprint->model);
+    //print_footprint_properties(footprint->properties);
+    //print_line(footprint->fp_lines);
+    //print_pad(footprint->pads);
+    //print_model(footprint->model);
     footprint = footprint->next;
   }
   printf("(ORDINAL: %d; CANONICAL_NAME: \"%s\"; TYPE: %d; USER_NAME: \"%s\")\n", pcb->footprints->layer->ordinal, pcb->footprints->layer->canonical_name.chars, pcb->footprints->layer->type, pcb->footprints->layer->user_name.chars);    
@@ -114,5 +114,15 @@ void print_tracks(struct Track *track){
     }
     printf("(uuid %s)\n", track->uuid.chars);
     track = track->next;
+  }
+}
+
+void print_zone(struct Zone *zone){
+  while(zone){
+    printf("(zone\n");
+    printf("(net %d)\n", zone->net->ordinal);
+    printf("(net_name \"%s\")\n", zone->net->name.chars);
+    printf(")\n");
+    zone = zone->next;
   }
 }

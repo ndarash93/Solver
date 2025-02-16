@@ -99,8 +99,8 @@ struct Layer {
   struct Section_Index index;
   int ordinal, type;
   String canonical_name, user_name;
-  String material;
-  float thickness, permittivity, loss_tangent; 
+  String material, stackup_type;
+  float thickness, loss_tangent, epsilon_r; 
   struct Layer *prev, *next;
 };
 
@@ -109,15 +109,15 @@ struct Layers {
   struct Layer  *layer;
 };
 
-struct Stackup{
-  struct Section_Index index;
-  // Add
-}; 
-
 struct Property{
   String key;
   String val;
   struct Property *next, *prev;
+};
+
+struct Stackup{
+  struct Section_Index index;
+  String finish;
 };
 
 struct Setup {
@@ -408,6 +408,7 @@ extern struct Board {
   struct Page page;
   struct Layers layers;
   struct Setup setup;
+  struct Stackup stackup;
   struct Net *nets;
   struct Footprint *footprints;
   struct Graphic graphics;
@@ -436,3 +437,4 @@ void print_line(struct Line *line);
 void print_pad(struct Pad *pad);
 void print_model(struct Model *model);
 void print_tracks(struct Track *track);
+void print_zone(struct Zone *zone);

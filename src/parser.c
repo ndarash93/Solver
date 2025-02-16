@@ -10,7 +10,7 @@
 
 #define COPY(token, index, buff) (token[(index++)] = BUFF[(buff++)])
 
-#define PUSH(new, list) (list == NULL) ? (list = new) : (list->prev = new; new->next = list; list = new;)
+#define PUSH(new, list) (list == NULL) ? (list = new, new->next = NULL) : (list->prev = new, new->next = list, list = new)
 
 // Hash table
 static int token_lookup(const char *token);
@@ -46,8 +46,8 @@ static int *handle_thickness(uint64_t start, uint64_t end);
 static int *handle_paper(uint64_t start, uint64_t end);
 static int *handle_layers(uint64_t start, uint64_t end);
 static int *handle_layer(uint64_t start, uint64_t end);
-
 static int *handle_setup(uint64_t start, uint64_t end);
+static int *handle_stackup(uint64_t start, uint64_t end);
 static int *handle_pad_to_mask_clearance(uint64_t start, uint64_t end);
 static int *handle_solder_mask_min_width(uint64_t start, uint64_t end);
 static int *handle_pad_to_paste_clearance(uint64_t start, uint64_t end);
@@ -76,6 +76,9 @@ static int *handle_segment(uint64_t start, uint64_t end);
 static int *handle_drill(uint64_t start, uint64_t end);
 static int *handle_arc(uint64_t start, uint64_t end);
 static int *handle_width(uint64_t start, uint64_t end);
+static int *handle_material(uint64_t start, uint64_t end);
+static int *handle_epsilon_r(uint64_t start, uint64_t end);
+static int *handle_loss_tangent(uint64_t start, uint64_t end);
 
 // Handler Helpers
 static int handle_quotes(uint64_t *start, uint64_t end, String *quote);
@@ -115,6 +118,7 @@ void token_table_init(){
   insert(tokens, (char *)"layers", handle_layers);
   insert(tokens, (char *)"layer", handle_layer);
   insert(tokens, (char *)"setup", handle_setup);
+  insert(tokens, (char *)"stackup", handle_stackup);
   insert(tokens, (char *)"pad_to_mask_clearance", handle_pad_to_mask_clearance);
   insert(tokens, (char *)"solder_mask_min_width", handle_solder_mask_min_width);
   insert(tokens, (char *)"pad_to_paste_clearance", handle_pad_to_paste_clearance);
@@ -141,6 +145,9 @@ void token_table_init(){
   insert(tokens, (char *)"rotate", handle_rotate);
   insert(tokens, (char *)"xyz", handle_xyz);
   insert(tokens, (char *)"width", handle_width);
+  insert(tokens, (char *)"material", handle_material);
+  insert(tokens, (char *)"epsilon_r", handle_epsilon_r);
+  insert(tokens, (char *)"loss_tangent", handle_loss_tangent);
   //print_table(tokens);
 }
 
@@ -671,21 +678,19 @@ static int *handle_general(uint64_t start, uint64_t end){
 static int *handle_thickness(uint64_t start, uint64_t end){
   //printf("Handle Thickness\n");
   if(pcb->general.index.set == SECTION_SET){
-    String thickness;
-    handle_value_token(&start, end, &thickness);    
-    char *endptr;
-    pcb->general.thickness = strtof(thickness.chars, &endptr);
-    free(thickness.chars);
-    if(thickness.chars == endptr){
-      //printf("Float Error\n");
-      return NULL;
+    float thickness;
+    if(sscanf(&BUFF[start], "(thickness %f)", &thickness) != 1){
+      printf("thickness 1\n");
     }
-    //printf("Found thickness: %fmm\n", pcb->general.thickness);
-    return NULL;
-  }else{
-    //printf("Interesting Error10\n");
-    return NULL;
+    pcb->general.thickness = thickness;
+  }else if(pcb->layers.layer->index.set == SECTION_SET){
+    float thickness;
+    if(sscanf(&BUFF[start], "(thickness %f)", &thickness) != 1){
+      printf("thickness 2\n");
+    }
+    pcb->layers.layer->thickness = thickness;
   }
+  return NULL;
 }
 
 static int *handle_paper(uint64_t start, uint64_t end){
@@ -863,6 +868,38 @@ static int *handle_layer(uint64_t start, uint64_t end){
       pcb->tracks->track.segment.layer = find_layer(name);
     }
     free(name.chars);
+  }else if(pcb->stackup.index.set == SECTION_SET){
+    String name;
+    name.length = 0;
+    name.chars = NULL;
+    struct Layer *layer;
+    int dielectric = 0;
+    handle_value_token(&start, end, &name);
+    layer = find_layer(name);
+    if(layer == NULL){
+      if(sscanf(name.chars, "dielectric %d", &dielectric) == 1){
+        //printf("Dielectric layer\n");
+        layer = malloc(sizeof(struct Layer));
+        //while(BUFF[++start] != '\"');
+        handle_value_token(&start, end, &layer->canonical_name);
+        PUSH(layer, pcb->layers.layer);
+      }
+    }
+    free(name.chars);
+    layer->index.section_start = start;
+    layer->index.section_end = end;
+    layer->index.set = SECTION_SET;
+    return &layer->index.set;
+  }
+  return NULL;
+}
+
+static int *handle_type(uint64_t start, uint64_t end){
+  if(pcb->layers.layer && pcb->layers.layer->index.set == SECTION_SET){
+    String type;
+    //while(BUFF[++start] != '\"');
+    handle_value_token(&start, end, &type);
+    pcb->layers.layer->stackup_type = type;
   }
   return NULL;
 }
@@ -874,6 +911,16 @@ static int *handle_setup(uint64_t start, uint64_t end){
     pcb->setup.index.section_end = end;
     pcb->setup.index.set = SECTION_SET;
     return &pcb->setup.index.set;
+  }
+  return NULL;
+}
+
+static int *handle_stackup(uint64_t start, uint64_t end){
+  if(pcb->setup.index.set == SECTION_SET){
+    pcb->stackup.index.section_start = start;
+    pcb->stackup.index.section_end = end;
+    pcb->stackup.index.set = SECTION_SET;
+    return &pcb->stackup.index.set;
   }
   return NULL;
 }
@@ -900,15 +947,17 @@ static int *handle_pad_to_mask_clearance(uint64_t start, uint64_t end){
 static int *handle_solder_mask_min_width(uint64_t start, uint64_t end){
   //printf("andle_solder_mask_min_width\n");
   if(pcb->setup.index.set == SECTION_SET){
-    String width;
-    float f_width;
-    handle_value_token(&start, end, &width);
-    char *endptr;
-    f_width = strtof(width.chars, &endptr);    
-    if(width.chars == endptr){
-      return NULL;
+    //String width;
+    float width;
+    //handle_value_token(&start, end, &width);
+    //char *endptr;
+    //f_width = strtof(width.chars, &endptr);    
+    //if(width.chars == endptr){
+      //return NULL;
+    if(sscanf(&BUFF[start], "(solder_mask_min_width %f)", &width) != 1){
+      fprintf(stderr, "No soldermask width\n");
     }
-    pcb->setup.solder_mask_min_width = f_width;
+    pcb->setup.solder_mask_min_width = width;
     return NULL;
   }
   return NULL;
@@ -964,18 +1013,13 @@ static int *handle_net(uint64_t start, uint64_t end){
   //printf("Handle Net1\n");
   int ordinal = -1;
   struct Net *net;
-  if(sscanf(&BUFF[start], "(net %d \"%*s\")", &ordinal) != 1){
-    printf("Net error\n");
+  if(sscanf(&BUFF[start], "(net %d \"%*s\")", &ordinal) == 1){
+    //printf("Net error 1\n");
+  }else if(sscanf(&BUFF[start], "(net %d)", &ordinal) == 1){
+    //printf("Net error 2\n");
   }
   net = find_net(ordinal);
   if(pcb->footprints && pcb->footprints->index.set == SECTION_SET && pcb->footprints->pads && pcb->footprints->pads->index.set == SECTION_SET){
-    String ordinal_S;
-    int ordinal = -1;
-    struct Net *net = NULL;
-    handle_value_token(&start, end, &ordinal_S);
-    ordinal = atoi(ordinal_S.chars);
-    free(ordinal_S.chars);
-    net = find_net(ordinal);
     pcb->footprints->pads->net = net;
   }else if(pcb->tracks && pcb->tracks->index.set == SECTION_SET){
     switch(pcb->tracks->type){
@@ -990,19 +1034,12 @@ static int *handle_net(uint64_t start, uint64_t end){
         break;
     }
   }else if (pcb->zones && pcb->zones->index.set == SECTION_SET){
-
+    pcb->zones->net = net;
   }else{
-    //printf("Handle Net2\n");
-    char s_ordinal[TOKEN_SZ];
-    int ordinal_index = 0;
     String name;
     while(BUFF[++start] != ' ');
     while(start++ < end){
-      if(BUFF[start] < '9' && BUFF[start] > '0'){
-        //printf("Ordinal: %c\n", BUFF[start]);
-        COPY(s_ordinal, ordinal_index, start);
-      }
-      else if(BUFF[start] == '\"'){
+      if(BUFF[start] == '\"'){
         handle_quotes(&start, end, &name);
       }
     }
@@ -1011,19 +1048,11 @@ static int *handle_net(uint64_t start, uint64_t end){
     net->index.section_end = end;
     net->index.set = SECTION_SET;
     net->name = name;
-    net->ordinal = atoi(s_ordinal);
+    net->ordinal = ordinal;
     net->next = NULL;
     net->prev = NULL;
 
-    s_ordinal[ordinal_index++] = '\0';
-    //printf("%s\n", s_ordinal);
-    if(pcb->nets == NULL){
-      pcb->nets = net;
-    }else{
-      pcb->nets->prev = net;
-      net->next = pcb->nets;
-      pcb->nets = net;
-    }
+    PUSH(net, pcb->nets);
     //printf("Handle Net3\n");
     return &net->index.set;
   }
@@ -1033,7 +1062,7 @@ static int *handle_net(uint64_t start, uint64_t end){
 
 static int *handle_footprint(uint64_t start, uint64_t end){
   //printf("Handle Foot1\n");
-  struct Footprint *footprint = malloc(sizeof( struct Footprint));
+  struct Footprint *footprint = malloc(sizeof(struct Footprint));
   footprint->index.section_start = start;
   footprint->index.section_end = end;
   footprint->index.set = SECTION_SET;
@@ -1110,13 +1139,14 @@ static int *handle_zone(uint64_t start, uint64_t end){
   zone->index.section_start = start;
   zone->index.section_end = end;
   zone->index.set = SECTION_SET;
-  if(pcb->zones == NULL){
+  /*if(pcb->zones == NULL){
     pcb->zones = zone;
   }else{
     pcb->zones->prev = zone;
     zone->next = pcb->zones;
     pcb->zones = zone;
-  }
+  }*/
+  PUSH(zone, pcb->zones);
   //printf("Handle Zone2\n");
   return &pcb->zones->index.set;
 }
@@ -1241,7 +1271,7 @@ static int *handle_end(uint64_t start, uint64_t end){
   if(sscanf(&BUFF[start], "(end %f %f)", &point.x, &point.y) == 2){
 
   }else{
-    fprintf(stderr, "Weird end\n");
+    //fprintf(stderr, "Weird end\n");
   }
   if(pcb->footprints->fp_lines && pcb->footprints->fp_lines->index.set == SECTION_SET){
     pcb->footprints->fp_lines->end = point;
@@ -1308,6 +1338,7 @@ static int *handle_pad(uint64_t start, uint64_t end){
     //printf("Pad1: %p", pad);
 
     if(pcb->footprints->pads == NULL){
+      pad->next = NULL;
       pcb->footprints->pads = pad;
     }else{
       pcb->footprints->pads->prev = pad;
@@ -1468,6 +1499,37 @@ static int *handle_arc(uint64_t start, uint64_t end){
   return &track->index.set;
 }
 
+static int *handle_material(uint64_t start, uint64_t end){
+  if(pcb->layers.layer->index.set == SECTION_SET){
+    String material;
+    //while(BUFF[++start] != '\"');
+    handle_value_token(&start, end, &material);
+    pcb->layers.layer->material = material;
+  }
+  return NULL;
+}
+
+static int *handle_epsilon_r(uint64_t start, uint64_t end){
+  if(pcb->layers.layer && pcb->layers.layer->index.set == SECTION_SET){
+    float epsilon_r;
+    if(sscanf(&BUFF[start], "(epsilon_r %f)", &epsilon_r) != 1){
+      printf("Epsilon_r Error\n");
+    }
+    pcb->layers.layer->epsilon_r = epsilon_r;
+  }
+  return NULL;
+}
+
+static int *handle_loss_tangent(uint64_t start, uint64_t end){
+  if(pcb->layers.layer && pcb->layers.layer->index.set == SECTION_SET){
+    float loss;
+    if(sscanf(&BUFF[start], "(loss_tangent %f)", &loss) != 1){
+      printf("Loss error\n");
+    }
+    pcb->layers.layer->loss_tangent = loss;
+  }
+  return NULL;
+}
 
 /*
 static int *handle_text(uint64_t start, uint64_t end){

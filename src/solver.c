@@ -16,6 +16,7 @@ int main(int argc, char **argv){
   
   //print_footprints(pcb->footprints);
   //print_tracks(pcb->tracks);
+  //print_zone(pcb->zones);
   free_pcb();
 
   return EXIT_SUCCESS;
@@ -23,14 +24,14 @@ int main(int argc, char **argv){
 
 
 void free_pcb(){
-  a();
+  //a();
   struct Layer *layer = pcb->layers.layer;
   struct Net *net = pcb->nets;
   struct Footprint *footprint = pcb->footprints;
   struct Track *track = pcb->tracks;
   struct Zone *zone = pcb->zones;
   
-  a();
+  //a();
   free(pcb->header.version.chars);
   free(pcb->header.generator.chars);
   free(pcb->header.generator_version.chars);
@@ -41,16 +42,17 @@ void free_pcb(){
     free(temp->canonical_name.chars);
     free(temp->user_name.chars);
     free(temp->material.chars);
+    free(temp->stackup_type.chars);
     free(temp);
   }
-  a();
+  //a();
   while(net){
     struct Net *temp = net;
     net = net->next;
     free(temp->name.chars);
     free(temp);
   }
-  a();
+  //a();
   while(footprint){
     struct Footprint *temp = footprint;
     footprint = footprint->next;
@@ -67,7 +69,7 @@ void free_pcb(){
           free(temp_property);
         }
       }
-      a();
+      //a();
       if(temp->fp_lines){
         struct Line  *line = temp->fp_lines;
         struct Line  *temp_line;
@@ -78,27 +80,20 @@ void free_pcb(){
           free(temp_line);
         }
       }
-      a();
+      //a();
       if(temp->pads){
         struct Pad *pad = temp->pads;
         struct Pad * temp_pad;
         while(pad){
-          a();
           temp_pad = pad;
-          a();
-          printf("Pad: %p\n", pad);
+          //printf("Pad: %p\n", pad);
           pad = pad->next;
-          a();
           free(temp_pad->num.chars);
-          a();
           free(temp_pad->uuid.chars);
-          a();
           free(temp_pad->layers);
-          a();
           free(temp_pad);
         }
       }
-      a();
       if(temp->model){
         free(temp->model->model.chars);
         free(temp->model);
@@ -110,7 +105,6 @@ void free_pcb(){
     free(temp->uuid.chars);
     free(temp);
   }
-  a();
   while(track){
     struct Track *temp = track;
     track = track->next;
@@ -124,7 +118,6 @@ void free_pcb(){
     }
     free(temp);
   }
-  a();
   while(zone){
     struct Zone *temp = zone;
     zone = zone->next;
