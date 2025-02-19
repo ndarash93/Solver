@@ -303,10 +303,11 @@ struct Arc{
 
 struct Polygon{
   struct Section_Index index;
-  struct Point **points;
+  struct Point *points;
   struct Layer *layer;
   float width;
   int fill;
+  int point_count, point_index;
   String uuid;
 };
 
@@ -390,7 +391,7 @@ struct Zone {
   uint32_t priority;
   int hatch_style, connect_pads, fill;
   float min_thickness, hatch_pitch;
-  struct Point **points, **filled_points;
+  struct Polygon polygon, filled_polygon;
   struct Zone *next, *prev;
 };
 

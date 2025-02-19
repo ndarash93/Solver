@@ -16,7 +16,7 @@ int main(int argc, char **argv){
   
   //print_footprints(pcb->footprints);
   //print_tracks(pcb->tracks);
-  //print_zone(pcb->zones);
+  print_zone(pcb->zones);
   free_pcb();
 
   return EXIT_SUCCESS;
@@ -122,6 +122,8 @@ void free_pcb(){
     struct Zone *temp = zone;
     zone = zone->next;
     free(temp->uuid.chars);
+    free(temp->polygon.points);
+    free(temp->filled_polygon.points);
     free(temp);
   }
   free(pcb);

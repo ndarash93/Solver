@@ -79,6 +79,10 @@ static int *handle_width(uint64_t start, uint64_t end);
 static int *handle_material(uint64_t start, uint64_t end);
 static int *handle_epsilon_r(uint64_t start, uint64_t end);
 static int *handle_loss_tangent(uint64_t start, uint64_t end);
+static int *handle_polygon(uint64_t start, uint64_t end);
+static int *handle_filled_polygon(uint64_t start, uint64_t end);
+static int *handle_pts(uint64_t start, uint64_t end);
+static int *handle_xy(uint64_t start, uint64_t end);
 
 // Handler Helpers
 static int handle_quotes(uint64_t *start, uint64_t end, String *quote);
@@ -148,6 +152,10 @@ void token_table_init(){
   insert(tokens, (char *)"material", handle_material);
   insert(tokens, (char *)"epsilon_r", handle_epsilon_r);
   insert(tokens, (char *)"loss_tangent", handle_loss_tangent);
+  insert(tokens, (char *)"polygon", handle_polygon);
+  insert(tokens, (char *)"filled_polygon", handle_filled_polygon);
+  insert(tokens, (char *)"pts", handle_pts);
+  insert(tokens, (char *)"xy", handle_xy);
   //print_table(tokens);
 }
 
@@ -161,6 +169,7 @@ int open_pcb(const char *path){
 
   if (file == NULL){
     perror("Error opening file");
+    goto clean_up;
     return ERROR;
   }
   //pcb->file = file;
@@ -1139,13 +1148,6 @@ static int *handle_zone(uint64_t start, uint64_t end){
   zone->index.section_start = start;
   zone->index.section_end = end;
   zone->index.set = SECTION_SET;
-  /*if(pcb->zones == NULL){
-    pcb->zones = zone;
-  }else{
-    pcb->zones->prev = zone;
-    zone->next = pcb->zones;
-    pcb->zones = zone;
-  }*/
   PUSH(zone, pcb->zones);
   //printf("Handle Zone2\n");
   return &pcb->zones->index.set;
@@ -1527,6 +1529,82 @@ static int *handle_loss_tangent(uint64_t start, uint64_t end){
       printf("Loss error\n");
     }
     pcb->layers.layer->loss_tangent = loss;
+  }
+  return NULL;
+}
+
+static int *handle_polygon(uint64_t start, uint64_t end){
+  if(pcb->zones && pcb->zones->index.set == SECTION_SET){
+    pcb->zones->polygon.index.section_start = start;
+    pcb->zones->polygon.index.section_end = end;
+    pcb->zones->polygon.index.set = SECTION_SET;
+    
+    return &pcb->zones->polygon.index.set;
+  }
+  return NULL;
+}
+
+static int *handle_filled_polygon(uint64_t start, uint64_t end){
+  if(pcb->zones && pcb->zones->index.set == SECTION_SET){
+    pcb->zones->filled_polygon.index.section_start = start;
+    pcb->zones->filled_polygon.index.section_end = end;
+    pcb->zones->filled_polygon.index.set = SECTION_SET;
+    return &pcb->zones->filled_polygon.index.set;
+  }
+  return NULL;
+}
+
+static int *handle_pts(uint64_t start, uint64_t end){
+  int point_count = 0, open = 0;
+  if(pcb->zones && pcb->zones->index.set == SECTION_SET && pcb->zones->polygon.index.set == SECTION_SET){
+    while(++start < end){
+      if(BUFF[start] == '('){
+        open++;
+        point_count++;
+      }else if(BUFF[start] == ')'){
+        open--;
+      }
+    }
+    if (open != 0){
+      printf("Weird error\n");
+    }
+    struct Point *pts = calloc(point_count, sizeof(struct Point));
+    printf("Address: %p\n", pts);
+    pcb->zones->polygon.points = pts;
+    pcb->zones->polygon.point_index = 0;
+    pcb->zones->polygon.point_count = point_count;
+    //printf("Number of Points %d\n", point_count);
+  }else if(pcb->zones && pcb->zones->index.set == SECTION_SET && pcb->zones->filled_polygon.index.set == SECTION_SET){
+    while(++start < end){
+      if(BUFF[start] == '('){
+        open++;
+        point_count++;
+      }else if(BUFF[start] == ')'){
+        open--;
+      }
+    }
+    if (open != 0){
+      printf("Weird error\n");
+    }
+    struct Point *pts = calloc(point_count, sizeof(struct Point));
+    pcb->zones->filled_polygon.points = pts;
+    pcb->zones->filled_polygon.point_index = 0;
+    pcb->zones->filled_polygon.point_count = point_count;
+    //printf("Number of Filled Points %d opens %d\n", point_count, open);
+  }
+  return NULL;
+}
+
+static int *handle_xy(uint64_t start, uint64_t end){
+  struct Point point;
+  point.x = 0, point.y = 0;
+  if(sscanf(&BUFF[start], "(xy %f %f)", &point.x, &point.y) != 2){
+    printf("XY Error\n");
+  }
+  if(pcb->zones && pcb->zones->polygon.index.set == SECTION_SET){
+    pcb->zones->polygon.points[pcb->zones->polygon.point_index++] = point;
+  }else if(pcb->zones && pcb->zones->filled_polygon.index.set == SECTION_SET){
+    pcb->zones->filled_polygon.points[pcb->zones->filled_polygon.point_index++] = point;
   }
   return NULL;
 }

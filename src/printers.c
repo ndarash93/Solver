@@ -122,6 +122,18 @@ void print_zone(struct Zone *zone){
     printf("(zone\n");
     printf("(net %d)\n", zone->net->ordinal);
     printf("(net_name \"%s\")\n", zone->net->name.chars);
+    printf("(polygon\n");
+    printf("\t(pts\n");
+    for(int i = 0; i < zone->polygon.point_count; i++){
+      printf("\t\t(xy %f, %f)\n", zone->polygon.points[i].x, zone->polygon.points[i].y);
+    }
+    printf(")");
+    printf("(filled_polygon\n");
+    printf("\t(pts\n");
+    for(int i = 0; i < zone->filled_polygon.point_count; i++){
+      printf("\t\t(xy %f, %f)\n", zone->filled_polygon.points[i].x, zone->filled_polygon.points[i].y);
+    }
+    printf("\t)\n");
     printf(")\n");
     zone = zone->next;
   }
